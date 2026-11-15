@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -202,14 +203,44 @@ def _check_path_count(report: dict) -> None:
     }
 
 
-def _restart_then_write(report: dict) -> None:
+def _check_weighted_sum(report: dict) -> None:
+    """A 3-hop path must beat a shorter one when the edge costs say so."""
+
+    client = _client()
+    hops = [(930010, 930011, 1.5), (930011, 930012, 1.5), (930012, 930013, 1.0)]
+    for src, dst, cost in hops:
+        client.query(
+            "MERGE (a:Entity {id: $src})-[:OWNS {source: 'registry', cost: $cost, rel_id: 930}]->(b:Entity {id: $dst})",
+            {"src": src, "dst": dst, "cost": cost},
+        )
+    client.query(
+        "MERGE (a:Entity {id: 930010})-[:OWNS {source: 'scraper', cost: 3.0, rel_id: 930}]->(b:Entity {id: 930021})"
+    )
+    client.query(
+        "MERGE (a:Entity {id: 930021})-[:OWNS {source: 'scraper', cost: 3.0, rel_id: 930}]->(b:Entity {id: 930013})"
+    )
+    cypher, params = build_sp_paths(
+        src=930010, dst=930013, weighted=True, total=4, max_len=3, rel_types=["OWNS"]
+    )
+    payload = client.query(cypher, params)
+    weights = []
+    for row in payload["rows"]:
+        weight = row[1].get("value")
+        nodes = row[0]["value"]["nodes"]
+        weights.append((float(weight), len(nodes) - 1))
+    weights.sort()
+    report["weighted_sum"] = {"paths": weights}
+    if not weights or weights[0][1] != 3 or abs(weights[0][0] - 4.0) > 0.05:
+        raise HydraError(f"weighted 3-hop sum was not the winner: {weights}")
+    report.setdefault("shapes", {})["weighted_sum"] = "ok"
+
+
+def _restart_then_write(report: dict, restart) -> None:
     client = _client()
     client.query(
         "MERGE (a:Entity {id: 920001, name: 'before-restart'})-[:OWNS {source: 'registry', cost: 1.0}]->(b:Entity {id: 920002, name: 'tail'})"
     )
-    restarted = _run(["docker", "restart", HYDRA_NAME])
-    if restarted.returncode != 0:
-        raise HydraError(restarted.stderr.strip() or "docker restart failed")
+    restart()
     if not _wait_http(f"{QUERY}/healthz", timeout=120):
         raise HydraError("query node did not return /healthz after restart")
     # A restart drops the process cache. strong consistency re-reads the bucket.
@@ -370,6 +401,96 @@ def _start_stack() -> None:
         raise HydraError("HydraDB /healthz did not come up\n" + logs.stdout + logs.stderr)
 
 
+def _graph_node_pids() -> list[int]:
+    found = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            raw = Path(f"/proc/{entry}/cmdline").read_bytes()
+        except OSError:
+            continue
+        command = raw.replace(b"\x00", b" ").decode(errors="ignore")
+        if "graph-node" in command:
+            found.append(int(entry))
+    return found
+
+
+def _native_launch_info() -> dict:
+    root = Path(os.environ.get("DG_HYDRA_ROOT", Path.home() / "hydradb-root"))
+    binary = root / "usr/local/bin/graph-node"
+    return {
+        "binary": str(binary),
+        "binary_exists": binary.is_file(),
+        "library_path": str(root / "usr/lib/x86_64-linux-gnu"),
+        "cloud_provider": "aws",
+        "object_store": "moto",
+        "note": (
+            "Extracted ghcr.io/hydra-db/hydradb:0.4.0 without Docker. "
+            "CLOUD_PROVIDER=local rejects PutMode::Update, so the node uses moto. "
+            "libgraphblas is loaded from the image via LD_LIBRARY_PATH."
+        ),
+    }
+
+
+def _ensure_moto() -> None:
+    if _wait_http("http://127.0.0.1:4566/", timeout=1):
+        _ensure_bucket()
+        return
+    moto = ROOT / ".venv" / "bin" / "moto_server"
+    if not moto.is_file():
+        raise HydraError(f"moto_server missing at {moto}; pip install 'moto[server]'")
+    log = open("/tmp/moto-probe.log", "ab")
+    subprocess.Popen([str(moto), "-H", "0.0.0.0", "-p", "4566"], stdout=log, stderr=subprocess.STDOUT)
+    if not _wait_http("http://127.0.0.1:4566/", timeout=30):
+        raise HydraError("moto did not listen on 4566")
+    _ensure_bucket()
+
+
+def _ensure_bucket() -> None:
+    import boto3
+
+    client = boto3.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url="http://127.0.0.1:4566",
+        aws_access_key_id="testing",
+        aws_secret_access_key="testing",
+    )
+    existing = {bucket["Name"] for bucket in client.list_buckets().get("Buckets", [])}
+    if "dreamgraph" not in existing:
+        client.create_bucket(Bucket="dreamgraph")
+
+
+def _spawn_native() -> subprocess.Popen:
+    info = _native_launch_info()
+    if not info["binary_exists"]:
+        raise HydraError(f"native binary missing: {info['binary']}. Run scripts/extract_hydradb_image.py")
+    _ensure_moto()
+    script = ROOT / "scripts" / "run_hydradb_native.sh"
+    log = open("/tmp/hydradb-native.log", "ab")
+    proc = subprocess.Popen(["bash", str(script)], stdout=log, stderr=subprocess.STDOUT)
+    if not _wait_http(f"{QUERY}/healthz", timeout=60):
+        raise HydraError("native graph-node did not open /healthz; see /tmp/hydradb-native.log")
+    return proc
+
+
+def _stop_graph_nodes() -> None:
+    for pid in _graph_node_pids():
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    deadline = time.time() + 20
+    while time.time() < deadline and _graph_node_pids():
+        time.sleep(0.2)
+    for pid in _graph_node_pids():
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def main() -> int:
     report: dict = {
         "image": IMAGE,
@@ -382,37 +503,57 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001 — the probe must record the failure, not hide it
         report["digest_error"] = str(exc)
 
-    if not report["docker"]:
-        report["status"] = "skipped_no_docker"
-        report["message"] = (
-            "Docker is not on PATH. Registry digest lookup is not a live engine check. "
-            "See docs/HYDRA_RUNBOOK.md."
-        )
-        _write(report)
-        print(json.dumps({"status": report["status"], "wrote": str(OUT)}, indent=2))
-        return 2
+    native_proc: subprocess.Popen | None = None
+
+    def restart_docker() -> None:
+        restarted = _run(["docker", "restart", HYDRA_NAME])
+        if restarted.returncode != 0:
+            raise HydraError(restarted.stderr.strip() or "docker restart failed")
+
+    def restart_native() -> None:
+        nonlocal native_proc
+        _stop_graph_nodes()
+        native_proc = _spawn_native()
 
     try:
-        _start_stack()
-        digest = _run(
-            ["docker", "image", "inspect", IMAGE, "--format", "{{index .RepoDigests 0}}"]
-        )
-        report["local_repo_digest"] = (digest.stdout or digest.stderr).strip()
+        if report["docker"]:
+            _start_stack()
+            digest = _run(
+                ["docker", "image", "inspect", IMAGE, "--format", "{{index .RepoDigests 0}}"]
+            )
+            report["local_repo_digest"] = (digest.stdout or digest.stderr).strip()
+            report["runtime"] = "docker"
+            restart = restart_docker
+        else:
+            report["runtime"] = "native"
+            report["native"] = _native_launch_info()
+            if not _wait_http(f"{QUERY}/healthz", timeout=2):
+                native_proc = _spawn_native()
+            else:
+                report["native"]["adopted_existing"] = True
+            restart = restart_native
         _check_shapes(report)
+        _check_weighted_sum(report)
         _check_path_count(report)
-        _restart_then_write(report)
-        failed = [name for name, status in report.get("shapes", {}).items() if status != "ok"]
+        _restart_then_write(report, restart)
+        failed = [name for name, status in report.get("shapes", {}).items() if not str(status).startswith("ok")]
         report["live_engine"] = not failed and report["restart_then_write"]["passed"]
         report["status"] = "passed" if report["live_engine"] else "failed"
     except Exception as exc:  # noqa: BLE001
         report["status"] = "failed"
         report["error"] = str(exc)
-        logs = _run(["docker", "logs", "--tail", "60", HYDRA_NAME]) if report["docker"] else None
-        if logs is not None:
+        if report["docker"]:
+            logs = _run(["docker", "logs", "--tail", "60", HYDRA_NAME])
             report["hydra_logs_tail"] = (logs.stdout + logs.stderr)[-4000:]
+        elif native_proc is not None and native_proc.poll() is not None:
+            report["native_exit"] = native_proc.returncode
     finally:
-        if os.environ.get("DG_PROBE_KEEP") != "1":
-            _cleanup()
+        keep = os.environ.get("DG_PROBE_KEEP")
+        if report.get("runtime") == "docker":
+            if keep != "1":
+                _cleanup()
+        elif keep == "0" and native_proc is not None and native_proc.poll() is None:
+            native_proc.terminate()
         _write(report)
 
     print(json.dumps({"status": report["status"], "live_engine": report["live_engine"], "wrote": str(OUT)}, indent=2))

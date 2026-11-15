@@ -11,11 +11,57 @@
   },
   "docker": false,
   "image": "ghcr.io/hydra-db/hydradb:0.4.0",
-  "live_engine": false,
-  "message": "Docker is not on PATH. Registry digest lookup is not a live engine check. See docs/HYDRA_RUNBOOK.md.",
+  "live_engine": true,
+  "native": {
+    "adopted_existing": true,
+    "binary": "/home/ubuntu/hydradb-root/usr/local/bin/graph-node",
+    "binary_exists": true,
+    "cloud_provider": "aws",
+    "library_path": "/home/ubuntu/hydradb-root/usr/lib/x86_64-linux-gnu",
+    "note": "Extracted ghcr.io/hydra-db/hydradb:0.4.0 without Docker. CLOUD_PROVIDER=local rejects PutMode::Update, so the node uses moto. libgraphblas is loaded from the image via LD_LIBRARY_PATH.",
+    "object_store": "moto"
+  },
   "path_budget_contract": {
     "pathCount": 4,
     "resultLimit": 4
   },
-  "status": "skipped_no_docker"
+  "path_count_probe": {
+    "interpretation": "On a single source, a total cap and a per-source cap both return 2. Row count is recorded so a human can compare it with TrailMend. The client still sizes pathCount as a total and sets resultLimit equal to it.",
+    "pathCount": 2,
+    "resultLimit": 8,
+    "rows": 2
+  },
+  "query_ids_sent": 6,
+  "restart_then_write": {
+    "name_after_restart": [
+      "before-restart"
+    ],
+    "original_still_readable": true,
+    "passed": true,
+    "second_write_rows": 1
+  },
+  "runtime": "native",
+  "shapes": {
+    "match_return": "ok",
+    "merge_edge": "ok",
+    "set_relationship_cost": "ok",
+    "sppaths_weighted": "ok",
+    "sspaths_unweighted": "ok",
+    "sspaths_weighted": "ok",
+    "unique_query_id": "ok",
+    "weighted_sum": "ok"
+  },
+  "status": "passed",
+  "weighted_sum": {
+    "paths": [
+      [
+        4.0,
+        3
+      ],
+      [
+        6.0,
+        2
+      ]
+    ]
+  }
 }
