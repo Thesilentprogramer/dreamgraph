@@ -11,7 +11,19 @@ import argparse
 import json
 
 from dreamgraph.config import DRIFT_ITER, DRIFT_MIN_REL, WINDOW
-from dreamgraph.world import apply_drift, generate_world, source_endpoint
+from dreamgraph.search import predict_relation
+from dreamgraph.world import apply_drift, generate_world
+
+
+def _chains(world, rel: int) -> dict:
+    return {
+        chain.name: {
+            "sources": [world.edges[index].source for index in chain.edge_indexes],
+            "person": chain.person,
+            "correct": chain.person == world.gold[rel],
+        }
+        for chain in world.chains[rel]
+    }
 
 
 def main() -> None:
@@ -22,10 +34,7 @@ def main() -> None:
     args = parser.parse_args()
 
     world = generate_world(args.seed)
-    before = {
-        source: source_endpoint(world, args.rel, source)
-        for source in ("wikidata", "registry", "scraper")
-    }
+    hand = {"wikidata": 1.0, "registry": 2.0, "scraper": 6.0}
     summary = {
         "seed": args.seed,
         "drift_iter": DRIFT_ITER,
@@ -35,14 +44,13 @@ def main() -> None:
         "heldout_relations": len(world.heldout_rels),
         "edges": len(world.edges),
         "sample_rel": args.rel,
-        "endpoints_before": before,
+        "chains_before": _chains(world, args.rel),
+        "chosen_before": predict_relation(world, args.rel, hand).path,
     }
     if args.drift:
         summary["swap"] = apply_drift(world)
-        summary["endpoints_after"] = {
-            source: source_endpoint(world, args.rel, source)
-            for source in ("wikidata", "registry", "scraper")
-        }
+        summary["chains_after"] = _chains(world, args.rel)
+        summary["chosen_after"] = predict_relation(world, args.rel, hand).path
         summary["gold"] = world.gold[args.rel]
     print(json.dumps(summary, indent=2, sort_keys=True))
 

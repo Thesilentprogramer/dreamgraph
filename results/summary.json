@@ -1,5 +1,5 @@
 {
-  "backend": "memory",
+  "backend": "hydradb",
   "config": {
     "batch": 40,
     "bootstrap": 1000,
@@ -22,31 +22,31 @@
   },
   "demo": {
     "agree": [
-      1001,
+      1000,
       1004
     ],
     "costs": {
-      "registry": 0.464286,
-      "scraper": 0.223881,
-      "wikidata": 2.565217
+      "registry": 0.486239,
+      "scraper": 0.50641,
+      "wikidata": 1.485294
     },
     "disagree": [
-      1000,
+      1001,
       1002,
       1003,
       1005,
-      1008,
-      1009
+      1006,
+      1007
     ],
     "drift_applied": true,
     "questions": [
-      1000,
+      1001,
       1002,
       1003,
       1005,
-      1008,
-      1009,
-      1001,
+      1006,
+      1007,
+      1000,
       1004
     ],
     "seed": 0
@@ -56,53 +56,55 @@
   "final_costs_by_seed": [
     {
       "dreamgraph": {
-        "registry": 0.344262,
-        "scraper": 0.261538,
-        "wikidata": 2.153846
+        "registry": 0.60396,
+        "scraper": 0.652482,
+        "wikidata": 1.671875
       },
       "frozen_at_3": {
-        "registry": 0.322581,
-        "scraper": 1.928571,
-        "wikidata": 0.171429
+        "registry": 0.542857,
+        "scraper": 2.115385,
+        "wikidata": 0.531646
       },
       "seed": 0
     },
     {
       "dreamgraph": {
-        "registry": 0.188406,
-        "scraper": 0.171429,
-        "wikidata": 1.645161
+        "registry": 0.486239,
+        "scraper": 0.65035,
+        "wikidata": 1.434783
       },
       "frozen_at_3": {
-        "registry": 0.301587,
-        "scraper": 2.416667,
-        "wikidata": 0.138889
+        "registry": 0.372881,
+        "scraper": 1.842105,
+        "wikidata": 0.581699
       },
       "seed": 1
     },
     {
       "dreamgraph": {
-        "registry": 0.344262,
-        "scraper": 0.413793,
-        "wikidata": 2.037037
+        "registry": 0.472727,
+        "scraper": 0.54,
+        "wikidata": 1.58209
       },
       "frozen_at_3": {
-        "registry": 0.223881,
-        "scraper": 3.1,
-        "wikidata": 0.366667
+        "registry": 0.572816,
+        "scraper": 1.945455,
+        "wikidata": 0.484663
       },
       "seed": 2
     }
   ],
-  "generated_at": "2026-11-15T19:20:18.869958+00:00",
-  "hydra_verified": false,
+  "generated_at": "2026-11-15T20:01:55.270883+00:00",
+  "hydra_verified": true,
   "load": {
-    "backend": "memory",
-    "n": 2400,
-    "p50_ms": 0.006538,
-    "p95_ms": 0.007979,
-    "p99_ms": 0.009512,
-    "what": "In-process DreamGraph held-out searches on seed 0. These are not HydraDB network latencies."
+    "backend": "hydradb",
+    "clients": 20,
+    "n": 600,
+    "p50_ms": 6.3278,
+    "p95_ms": 12.5614,
+    "p99_ms": 15.8808,
+    "rounds_per_client": 30,
+    "what": "20 concurrent clients, each issuing 30 weighted algo.SSpaths calls against the live node."
   },
   "methods": [
     "dreamgraph",
@@ -115,30 +117,31 @@
     "frozen_at_3"
   ],
   "noise": {
-    "description": "Synthetic source noise. Each vendor chain ends at the true owner with a fixed probability. Drift swaps labels; it does not resimulate endpoints.",
+    "chain_p_true": {
+      "alt": 0.45,
+      "long": 0.9,
+      "trap": 0.2
+    },
+    "description": "Synthetic chain noise. The 3-hop chain usually names the true owner; two 2-hop chains compete. Drift swaps wikidata and scraper labels and does not move the people. The answer is the person at the end of the minimum summed edge-cost path.",
     "drift_effect": "wikidata and scraper labels exchange on rel_id >= drift_min_rel",
     "drift_min_rel": 15,
-    "p_correct_before_drift": {
-      "registry": 0.72,
-      "scraper": 0.3,
-      "wikidata": 0.88
-    }
+    "path_cost": "sum of per-edge costs; each edge stores the learned cost of its current source"
   },
   "notes": [
     "Chart numbers are this document. The dashboard reads it; it does not embed a second copy.",
-    "backend=memory means Dijkstra ran in-process. HydraDB path calls are unverified until results/probe.json has live_engine=true.",
-    "The dict learner is the same refit over list[dict] edges. If its series matches DreamGraph, that is the measurement, not a bug to hide.",
+    "DreamGraph, unweighted, hand-set, one-shot, greedy, and frozen answers are algo.SSpaths round trips. The dict learner is the same refit and the same sum, evaluated on plain dicts.",
+    "hop3_rate is the share of answers whose chosen path has 3 edges. Unweighted prefers the 2-hop chains.",
     "precomputed=true means the file is an export of the object written during this run."
   ],
   "object_key": "results/summary.json",
   "policies": [
     {
       "costs": {
-        "registry": 0.375,
-        "scraper": 1.75,
-        "wikidata": 0.157895
+        "registry": 0.615385,
+        "scraper": 2.5,
+        "wikidata": 0.631579
       },
-      "guard_accuracy": 0.95,
+      "guard_accuracy": 0.75,
       "iteration": 1,
       "reason": "accepted",
       "rolled_back": false,
@@ -148,11 +151,11 @@
     },
     {
       "costs": {
-        "registry": 0.409091,
-        "scraper": 1.952381,
-        "wikidata": 0.148148
+        "registry": 0.671233,
+        "scraper": 2.8125,
+        "wikidata": 0.568966
       },
-      "guard_accuracy": 0.8,
+      "guard_accuracy": 0.9,
       "iteration": 2,
       "reason": "accepted",
       "rolled_back": false,
@@ -162,11 +165,11 @@
     },
     {
       "costs": {
-        "registry": 0.322581,
-        "scraper": 1.928571,
-        "wikidata": 0.171429
+        "registry": 0.542857,
+        "scraper": 2.115385,
+        "wikidata": 0.531646
       },
-      "guard_accuracy": 0.8,
+      "guard_accuracy": 0.9,
       "iteration": 3,
       "reason": "accepted",
       "rolled_back": false,
@@ -176,9 +179,9 @@
     },
     {
       "costs": {
-        "registry": 0.366667,
-        "scraper": 0.28125,
-        "wikidata": 1.484848
+        "registry": 0.5,
+        "scraper": 0.583893,
+        "wikidata": 1.333333
       },
       "guard_accuracy": 0.8,
       "iteration": 4,
@@ -190,11 +193,11 @@
     },
     {
       "costs": {
-        "registry": 0.518519,
-        "scraper": 0.28125,
-        "wikidata": 1.484848
+        "registry": 0.588235,
+        "scraper": 0.640845,
+        "wikidata": 1.408451
       },
-      "guard_accuracy": 0.9,
+      "guard_accuracy": 0.95,
       "iteration": 5,
       "reason": "accepted",
       "rolled_back": false,
@@ -204,9 +207,9 @@
     },
     {
       "costs": {
-        "registry": 0.518519,
-        "scraper": 0.261538,
-        "wikidata": 1.645161
+        "registry": 0.486239,
+        "scraper": 0.519737,
+        "wikidata": 1.369863
       },
       "guard_accuracy": 0.75,
       "iteration": 6,
@@ -218,11 +221,11 @@
     },
     {
       "costs": {
-        "registry": 0.464286,
-        "scraper": 0.223881,
-        "wikidata": 2.565217
+        "registry": 0.486239,
+        "scraper": 0.50641,
+        "wikidata": 1.485294
       },
-      "guard_accuracy": 0.75,
+      "guard_accuracy": 0.85,
       "iteration": 7,
       "reason": "accepted",
       "rolled_back": false,
@@ -232,11 +235,11 @@
     },
     {
       "costs": {
-        "registry": 0.344262,
-        "scraper": 0.261538,
-        "wikidata": 2.153846
+        "registry": 0.60396,
+        "scraper": 0.652482,
+        "wikidata": 1.671875
       },
-      "guard_accuracy": 0.65,
+      "guard_accuracy": 0.7,
       "iteration": 8,
       "reason": "accepted",
       "rolled_back": false,
@@ -246,11 +249,11 @@
     },
     {
       "costs": {
-        "registry": 0.294118,
-        "scraper": 2.666667,
-        "wikidata": 0.222222
+        "registry": 0.555556,
+        "scraper": 2.5,
+        "wikidata": 0.675676
       },
-      "guard_accuracy": 0.95,
+      "guard_accuracy": 0.85,
       "iteration": 1,
       "reason": "accepted",
       "rolled_back": false,
@@ -260,11 +263,11 @@
     },
     {
       "costs": {
-        "registry": 0.319149,
-        "scraper": 2.263158,
-        "wikidata": 0.107143
+        "registry": 0.506173,
+        "scraper": 2.210526,
+        "wikidata": 0.685185
       },
-      "guard_accuracy": 0.85,
+      "guard_accuracy": 1.0,
       "iteration": 2,
       "reason": "accepted",
       "rolled_back": false,
@@ -274,11 +277,11 @@
     },
     {
       "costs": {
-        "registry": 0.301587,
-        "scraper": 2.416667,
-        "wikidata": 0.138889
+        "registry": 0.372881,
+        "scraper": 1.842105,
+        "wikidata": 0.581699
       },
-      "guard_accuracy": 0.9,
+      "guard_accuracy": 0.85,
       "iteration": 3,
       "reason": "accepted",
       "rolled_back": false,
@@ -288,11 +291,11 @@
     },
     {
       "costs": {
-        "registry": 0.223881,
-        "scraper": 0.366667,
-        "wikidata": 1.827586
+        "registry": 0.338843,
+        "scraper": 0.546667,
+        "wikidata": 1.492754
       },
-      "guard_accuracy": 0.75,
+      "guard_accuracy": 0.85,
       "iteration": 4,
       "reason": "accepted",
       "rolled_back": false,
@@ -302,9 +305,9 @@
     },
     {
       "costs": {
-        "registry": 0.28125,
-        "scraper": 0.261538,
-        "wikidata": 1.733333
+        "registry": 0.472727,
+        "scraper": 0.633803,
+        "wikidata": 1.646154
       },
       "guard_accuracy": 0.8,
       "iteration": 5,
@@ -316,11 +319,11 @@
     },
     {
       "costs": {
-        "registry": 0.389831,
-        "scraper": 0.261538,
-        "wikidata": 2.153846
+        "registry": 0.5,
+        "scraper": 0.769231,
+        "wikidata": 1.636364
       },
-      "guard_accuracy": 0.9,
+      "guard_accuracy": 0.85,
       "iteration": 6,
       "reason": "accepted",
       "rolled_back": false,
@@ -330,11 +333,11 @@
     },
     {
       "costs": {
-        "registry": 0.322581,
-        "scraper": 0.28125,
-        "wikidata": 2.037037
+        "registry": 0.542857,
+        "scraper": 0.792308,
+        "wikidata": 1.630769
       },
-      "guard_accuracy": 0.9,
+      "guard_accuracy": 0.75,
       "iteration": 7,
       "reason": "accepted",
       "rolled_back": false,
@@ -344,9 +347,9 @@
     },
     {
       "costs": {
-        "registry": 0.188406,
-        "scraper": 0.171429,
-        "wikidata": 1.645161
+        "registry": 0.486239,
+        "scraper": 0.65035,
+        "wikidata": 1.434783
       },
       "guard_accuracy": 0.75,
       "iteration": 8,
@@ -358,11 +361,11 @@
     },
     {
       "costs": {
-        "registry": 0.222222,
-        "scraper": 1.75,
-        "wikidata": 0.1
+        "registry": 0.5,
+        "scraper": 1.8,
+        "wikidata": 0.589744
       },
-      "guard_accuracy": 0.7,
+      "guard_accuracy": 0.95,
       "iteration": 1,
       "reason": "accepted",
       "rolled_back": false,
@@ -372,9 +375,9 @@
     },
     {
       "costs": {
-        "registry": 0.169811,
-        "scraper": 2.647059,
-        "wikidata": 0.319149
+        "registry": 0.506173,
+        "scraper": 1.904762,
+        "wikidata": 0.433071
       },
       "guard_accuracy": 0.8,
       "iteration": 2,
@@ -386,11 +389,11 @@
     },
     {
       "costs": {
-        "registry": 0.223881,
-        "scraper": 3.1,
-        "wikidata": 0.366667
+        "registry": 0.572816,
+        "scraper": 1.945455,
+        "wikidata": 0.484663
       },
-      "guard_accuracy": 0.7,
+      "guard_accuracy": 0.8,
       "iteration": 3,
       "reason": "accepted",
       "rolled_back": false,
@@ -400,37 +403,37 @@
     },
     {
       "costs": {
-        "registry": 0.223881,
-        "scraper": 3.1,
-        "wikidata": 0.366667
+        "registry": 0.472727,
+        "scraper": 0.638298,
+        "wikidata": 1.402778
       },
-      "guard_accuracy": 0.8,
+      "guard_accuracy": 0.75,
       "iteration": 4,
-      "reason": "guard accuracy fell",
-      "rolled_back": true,
+      "reason": "accepted",
+      "rolled_back": false,
       "seed": 2,
       "version": 20,
       "window": 100
     },
     {
       "costs": {
-        "registry": 0.223881,
-        "scraper": 3.1,
-        "wikidata": 0.366667
+        "registry": 0.472727,
+        "scraper": 0.638298,
+        "wikidata": 1.544118
       },
-      "guard_accuracy": 0.85,
+      "guard_accuracy": 0.9,
       "iteration": 5,
-      "reason": "guard accuracy fell",
-      "rolled_back": true,
+      "reason": "accepted",
+      "rolled_back": false,
       "seed": 2,
       "version": 21,
       "window": 100
     },
     {
       "costs": {
-        "registry": 0.242424,
-        "scraper": 0.322581,
-        "wikidata": 1.342857
+        "registry": 0.528302,
+        "scraper": 0.644928,
+        "wikidata": 1.391892
       },
       "guard_accuracy": 0.9,
       "iteration": 6,
@@ -442,11 +445,11 @@
     },
     {
       "costs": {
-        "registry": 0.205882,
-        "scraper": 0.301587,
-        "wikidata": 1.645161
+        "registry": 0.486239,
+        "scraper": 0.509934,
+        "wikidata": 1.626866
       },
-      "guard_accuracy": 0.45,
+      "guard_accuracy": 0.7,
       "iteration": 7,
       "reason": "accepted",
       "rolled_back": false,
@@ -456,11 +459,11 @@
     },
     {
       "costs": {
-        "registry": 0.344262,
-        "scraper": 0.413793,
-        "wikidata": 2.037037
+        "registry": 0.472727,
+        "scraper": 0.54,
+        "wikidata": 1.58209
       },
-      "guard_accuracy": 0.7,
+      "guard_accuracy": 0.8,
       "iteration": 8,
       "reason": "accepted",
       "rolled_back": false,
@@ -474,263 +477,343 @@
   "rollback_counts": {
     "0": 0,
     "1": 0,
-    "2": 2
+    "2": 0
   },
   "series": {
     "bm25": {
       "accuracy": [
-        0.85,
-        0.85,
-        0.85,
-        0.337778,
-        0.337778,
-        0.337778,
-        0.337778,
-        0.337778
+        0.905556,
+        0.905556,
+        0.905556,
+        0.57,
+        0.57,
+        0.57,
+        0.57,
+        0.57
       ],
       "ci_high": [
-        0.873333,
-        0.872222,
-        0.872222,
-        0.37,
-        0.368889,
-        0.367778,
-        0.367778,
-        0.366667
+        0.923333,
+        0.924444,
+        0.924444,
+        0.602222,
+        0.6,
+        0.6,
+        0.602222,
+        0.601111
       ],
       "ci_low": [
-        0.828889,
-        0.827778,
-        0.826667,
-        0.306667,
-        0.308889,
-        0.306667,
-        0.306667,
-        0.304444
+        0.887778,
+        0.886667,
+        0.885556,
+        0.538889,
+        0.535556,
+        0.538889,
+        0.536667,
+        0.536667
+      ],
+      "hop3_rate": [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
       ]
     },
     "dict_learner": {
       "accuracy": [
-        0.63,
-        0.85,
-        0.804444,
-        0.47,
-        0.764444,
-        0.804444,
-        0.804444,
-        0.804444
+        0.206667,
+        0.905556,
+        0.905556,
+        0.458889,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556
       ],
       "ci_high": [
-        0.66,
-        0.872222,
-        0.827778,
-        0.498889,
-        0.793333,
-        0.83,
-        0.83,
-        0.83
+        0.233333,
+        0.924444,
+        0.926667,
+        0.491111,
+        0.924444,
+        0.924444,
+        0.924444,
+        0.922222
       ],
       "ci_low": [
-        0.6,
-        0.826667,
-        0.778889,
-        0.438889,
-        0.737778,
-        0.777778,
-        0.777778,
-        0.78
+        0.18,
+        0.885556,
+        0.885556,
+        0.425556,
+        0.884444,
+        0.886667,
+        0.886667,
+        0.886667
+      ],
+      "hop3_rate": [
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
       ]
     },
     "dreamgraph": {
       "accuracy": [
-        0.63,
-        0.85,
-        0.804444,
-        0.47,
-        0.764444,
-        0.804444,
-        0.804444,
-        0.804444
+        0.206667,
+        0.905556,
+        0.905556,
+        0.458889,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556
       ],
       "ci_high": [
-        0.662222,
-        0.872222,
-        0.831111,
-        0.5,
-        0.791111,
-        0.828889,
-        0.828889,
-        0.828889
+        0.232222,
+        0.923333,
+        0.923333,
+        0.49,
+        0.923333,
+        0.925556,
+        0.924444,
+        0.924444
       ],
       "ci_low": [
-        0.597778,
-        0.827778,
-        0.777778,
-        0.44,
-        0.735556,
-        0.777778,
-        0.777778,
-        0.776667
+        0.18,
+        0.885556,
+        0.885556,
+        0.425556,
+        0.887778,
+        0.886667,
+        0.887778,
+        0.884444
+      ],
+      "hop3_rate": [
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
       ]
     },
     "frozen_at_3": {
       "accuracy": [
-        0.63,
-        0.85,
-        0.804444,
-        0.47,
-        0.47,
-        0.47,
-        0.47,
-        0.47
+        0.206667,
+        0.905556,
+        0.905556,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889
       ],
       "ci_high": [
-        0.66,
-        0.872222,
-        0.83,
-        0.501111,
-        0.5,
-        0.501111,
-        0.503333,
-        0.5
+        0.233333,
+        0.924444,
+        0.923333,
+        0.49,
+        0.493333,
+        0.491111,
+        0.491111,
+        0.493333
       ],
       "ci_low": [
-        0.595556,
-        0.825556,
-        0.778889,
-        0.44,
-        0.44,
-        0.44,
-        0.44,
-        0.437778
+        0.18,
+        0.886667,
+        0.885556,
+        0.426667,
+        0.427778,
+        0.425556,
+        0.423333,
+        0.425556
+      ],
+      "hop3_rate": [
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
       ]
     },
     "greedy": {
       "accuracy": [
-        0.63,
-        0.804444,
-        0.814444,
-        0.337778,
-        0.728889,
-        0.804444,
-        0.804444,
-        0.814444
+        0.206667,
+        0.905556,
+        0.905556,
+        0.458889,
+        0.606667,
+        0.763333,
+        0.748889,
+        0.615556
       ],
       "ci_high": [
-        0.662222,
-        0.828889,
-        0.838889,
-        0.37,
-        0.758889,
-        0.83,
-        0.83,
-        0.838889
+        0.232222,
+        0.924444,
+        0.923333,
+        0.49,
+        0.636667,
+        0.79,
+        0.773333,
+        0.642222
       ],
       "ci_low": [
-        0.598889,
-        0.778889,
-        0.788889,
-        0.306667,
-        0.696667,
-        0.778889,
-        0.776667,
-        0.788889
+        0.178889,
+        0.887778,
+        0.885556,
+        0.428889,
+        0.578889,
+        0.737778,
+        0.724444,
+        0.59
+      ],
+      "hop3_rate": [
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        0.333333,
+        0.666667,
+        0.666667,
+        0.333333
       ]
     },
     "hand_set": {
       "accuracy": [
-        0.85,
-        0.85,
-        0.85,
-        0.337778,
-        0.337778,
-        0.337778,
-        0.337778,
-        0.337778
+        0.905556,
+        0.905556,
+        0.905556,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889
       ],
       "ci_high": [
-        0.872222,
-        0.873333,
-        0.873333,
-        0.367778,
-        0.367778,
-        0.367778,
-        0.366667,
-        0.367778
+        0.924444,
+        0.925556,
+        0.924444,
+        0.49,
+        0.491111,
+        0.49,
+        0.49,
+        0.491111
       ],
       "ci_low": [
-        0.826667,
-        0.826667,
-        0.826667,
-        0.306667,
-        0.308889,
-        0.306667,
-        0.307778,
-        0.306667
+        0.886667,
+        0.887778,
+        0.886667,
+        0.424444,
+        0.426667,
+        0.425556,
+        0.428889,
+        0.424444
+      ],
+      "hop3_rate": [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
       ]
     },
     "one_shot": {
       "accuracy": [
-        0.63,
-        0.85,
-        0.85,
-        0.337778,
-        0.337778,
-        0.337778,
-        0.337778,
-        0.337778
+        0.206667,
+        0.905556,
+        0.905556,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889
       ],
       "ci_high": [
-        0.66,
-        0.874444,
-        0.873333,
-        0.368889,
-        0.367778,
-        0.368889,
-        0.368889,
-        0.368889
+        0.232222,
+        0.923333,
+        0.925556,
+        0.491111,
+        0.488889,
+        0.491111,
+        0.491111,
+        0.492222
       ],
       "ci_low": [
-        0.598889,
-        0.825556,
-        0.825556,
-        0.307778,
-        0.305556,
-        0.306667,
-        0.307778,
-        0.306667
+        0.178889,
+        0.885556,
+        0.886667,
+        0.424444,
+        0.425556,
+        0.427778,
+        0.426667,
+        0.425556
+      ],
+      "hop3_rate": [
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
       ]
     },
     "unweighted": {
       "accuracy": [
-        0.63,
-        0.63,
-        0.63,
-        0.63,
-        0.63,
-        0.63,
-        0.63,
-        0.63
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667
       ],
       "ci_high": [
-        0.661111,
-        0.66,
-        0.663333,
-        0.658889,
-        0.658889,
-        0.661111,
-        0.662222,
-        0.661111
+        0.233333,
+        0.231111,
+        0.232222,
+        0.232222,
+        0.233333,
+        0.233333,
+        0.233333,
+        0.233333
       ],
       "ci_low": [
-        0.597778,
-        0.601111,
-        0.598889,
-        0.598889,
-        0.596667,
-        0.598889,
-        0.595556,
-        0.595556
+        0.18,
+        0.178889,
+        0.18,
+        0.181111,
+        0.181111,
+        0.178889,
+        0.18,
+        0.18
+      ],
+      "hop3_rate": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
       ]
     }
   },

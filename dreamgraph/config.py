@@ -6,11 +6,19 @@ import os
 
 SOURCES: tuple[str, ...] = ("wikidata", "registry", "scraper")
 
-# Synthetic observation noise. These are generator parameters, not measured rates.
-P_CORRECT: dict[str, float] = {
-    "wikidata": 0.88,
-    "registry": 0.72,
-    "scraper": 0.30,
+# Synthetic chain noise. These are generator parameters, not measured rates.
+# The long chain is three hops and usually names the true owner. The two
+# shorter chains compete with it, so the summed edge cost, not the hop count,
+# decides the answer.
+CHAIN_P_TRUE: dict[str, float] = {
+    "long": 0.90,
+    "trap": 0.20,
+    "alt": 0.45,
+}
+CHAIN_SOURCES: dict[str, tuple[str, ...]] = {
+    "long": ("wikidata", "registry", "wikidata"),
+    "trap": ("scraper", "wikidata"),
+    "alt": ("registry", "scraper"),
 }
 
 HAND_SET_COSTS: dict[str, float] = {

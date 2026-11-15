@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from dreamgraph.config import GUARD, SOURCES, WINDOW
-from dreamgraph.world import World, source_correct
+from dreamgraph.world import World, edge_feedback
 
 
 @dataclass
@@ -51,8 +51,8 @@ def refit_costs(questions: list[int], world: World) -> dict[str, float]:
     good = {source: 0 for source in SOURCES}
     bad = {source: 0 for source in SOURCES}
     for rel_id in questions:
-        for source in SOURCES:
-            if source_correct(world, rel_id, source):
+        for source, correct in edge_feedback(world, rel_id):
+            if correct:
                 good[source] += 1
             else:
                 bad[source] += 1
@@ -62,36 +62,26 @@ def refit_costs(questions: list[int], world: World) -> dict[str, float]:
     return costs
 
 
-def refit_costs_from_dicts(questions: list[int], edges: list[dict], leaf: dict[int, int], gold: dict[int, int]) -> dict[str, float]:
-    """Same formula as ``refit_costs``, over plain dict edges."""
+def refit_costs_from_dicts(
+    questions: list[int],
+    chains: dict[int, list[dict]],
+    gold: dict[int, int],
+) -> dict[str, float]:
+    """Same formula as ``refit_costs``, over plain dict chains.
+
+    Each chain dict has ``sources`` (current labels, one per edge) and ``person``.
+    """
 
     good = {source: 0 for source in SOURCES}
     bad = {source: 0 for source in SOURCES}
     for rel_id in questions:
-        company = leaf[rel_id]
-        for source in SOURCES:
-            claim = next(
-                (
-                    edge["dst"]
-                    for edge in edges
-                    if edge["rel_id"] == rel_id and edge["src"] == company and edge["source"] == source
-                ),
-                None,
-            )
-            person = None
-            if claim is not None:
-                person = next(
-                    (
-                        edge["dst"]
-                        for edge in edges
-                        if edge["rel_id"] == rel_id and edge["src"] == claim and edge["source"] == source
-                    ),
-                    None,
-                )
-            if person == gold[rel_id]:
-                good[source] += 1
-            else:
-                bad[source] += 1
+        for chain in chains[rel_id]:
+            correct = chain["person"] == gold[rel_id]
+            for source in chain["sources"]:
+                if correct:
+                    good[source] += 1
+                else:
+                    bad[source] += 1
     return {source: (bad[source] + 1.0) / (good[source] + 1.0) for source in SOURCES}
 
 

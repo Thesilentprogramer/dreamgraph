@@ -16,14 +16,11 @@ def test_refit_costs_stay_positive_and_match_the_dict_learner():
     questions = world.train_rels[:40]
     costs = refit_costs(questions, world)
     assert all(cost > 0 for cost in costs.values())
-    via_dicts = refit_costs_from_dicts(
-        questions, world.edges_as_dicts(), world.leaf, world.gold
-    )
+    via_dicts = refit_costs_from_dicts(questions, world.chains_as_dicts(), world.gold)
     assert costs.keys() == via_dicts.keys()
     for source in SOURCES:
         assert abs(costs[source] - via_dicts[source]) < 1e-9
-    # Wikidata is the most reliable label before drift, so it is the cheapest.
-    assert costs["wikidata"] < costs["registry"] < costs["scraper"]
+    assert costs["wikidata"] < costs["scraper"]
 
 
 def test_guard_rolls_back_a_hostile_update(monkeypatch):
@@ -58,4 +55,5 @@ def test_pre_drift_refit_prefers_wikidata_and_post_drift_window_flips():
     late = refit_costs(drifted_rels, world)
     assert late["scraper"] < late["wikidata"]
     prediction = predict_relation(world, 1000, late)
-    assert prediction.sources[0] == "scraper"
+    assert "scraper" in prediction.sources
+    assert len(prediction.path) == 4

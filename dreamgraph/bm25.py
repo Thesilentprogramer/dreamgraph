@@ -1,7 +1,7 @@
-"""BM25 over source-label tokens. The query prefers the literal word wikidata.
+"""BM25 over the vendor labels on each competing chain.
 
-This is a fixed lexical ranker. It does not read reviewer feedback, so a
-label swap sends it after the renamed chain.
+The query prefers the literal word wikidata. It does not read reviewer
+feedback, so a label swap moves which chain looks authoritative.
 """
 
 from __future__ import annotations
@@ -9,8 +9,8 @@ from __future__ import annotations
 import math
 from collections import Counter
 
-from dreamgraph.config import BM25_QUERY, SOURCES
-from dreamgraph.world import World, source_endpoint
+from dreamgraph.config import BM25_QUERY
+from dreamgraph.world import World
 
 
 def _scores(query: tuple[str, ...], documents: list[list[str]], k1: float = 1.2, b: float = 0.75) -> list[float]:
@@ -23,7 +23,7 @@ def _scores(query: tuple[str, ...], documents: list[list[str]], k1: float = 1.2,
     for doc in documents:
         term_frequency = Counter(doc)
         score = 0.0
-        length = len(doc)
+        length = len(doc) or 1
         for term in query:
             freq = term_frequency.get(term, 0)
             if freq == 0:
@@ -36,16 +36,15 @@ def _scores(query: tuple[str, ...], documents: list[list[str]], k1: float = 1.2,
     return scored
 
 
-def rank_sources(world: World, rel_id: int) -> str:
+def rank_chain(world: World, rel_id: int) -> tuple[int, tuple[str, ...]]:
+    """Return (person, source labels) of the highest-scoring chain."""
+
     documents = []
-    present = []
-    for source in SOURCES:
-        if source_endpoint(world, rel_id, source) is None:
-            continue
-        present.append(source)
-        documents.append([source, source, "ownership", "evidence"])
-    if not present:
-        raise RuntimeError(f"relation {rel_id} has no source path")
+    chains = []
+    for chain in world.chains[rel_id]:
+        sources = tuple(world.edges[index].source for index in chain.edge_indexes)
+        documents.append([*sources, "ownership", "evidence"])
+        chains.append((chain.person, sources))
     scores = _scores(BM25_QUERY, documents)
-    best = max(range(len(present)), key=lambda index: (scores[index], -index))
-    return present[best]
+    best = max(range(len(chains)), key=lambda index: (scores[index], -chains[index][0]))
+    return chains[best]

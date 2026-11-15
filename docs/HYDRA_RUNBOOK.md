@@ -4,6 +4,20 @@ DreamGraph talks to the open-source engine image `ghcr.io/hydra-db/hydradb:0.4.0
 
 Durable graph state is a bucket. The container's `/var/cache/slatedb` directory is a disposable cache. `CLOUD_PROVIDER=local` is not a supported DreamGraph layout: TrailMend lost the graph on restart when the only copy sat on local disk.
 
+## Native process, no Docker
+
+`CLOUD_PROVIDER=local` answers the create-only probe and then rejects updates (`PutMode::Update` is not implemented on the local filesystem). The live node therefore uses moto.
+
+```bash
+python scripts/extract_hydradb_image.py    # ghcr.io token, amd64 layers, unpack to ~/hydradb-root
+pip install 'moto[server]'
+.venv/bin/moto_server -H 0.0.0.0 -p 4566    # create bucket dreamgraph
+bash scripts/run_hydradb_native.sh
+python scripts/probe_hydradb.py             # exit 0 and live_engine true
+```
+
+`graph-node` is the image entrypoint. `libgraphblas.so.7` comes from the image via `LD_LIBRARY_PATH`. The host glibc is 2.39, which matches the Ubuntu 24.04 runtime in the image, so the system loader is enough.
+
 ## What this environment already recorded
 
 `make probe` always asks GHCR for the manifest index digest and writes `results/probe.json`.

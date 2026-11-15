@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dreamgraph import __version__
-from dreamgraph.bm25 import rank_sources
+from dreamgraph.bm25 import rank_chain
 from dreamgraph.config import (
     BACKEND,
     BATCH,
@@ -27,16 +27,17 @@ from dreamgraph.config import (
     HAND_SET_COSTS,
     HELD_OUT,
     ITERS,
-    P_CORRECT,
+    CHAIN_P_TRUE,
     SEEDS,
     SOURCES,
     WINDOW,
     uniform_costs,
 )
+from dreamgraph.hydra_graph import HydraGraph, concurrent_latencies
 from dreamgraph.learner import consider_update, refit_costs_from_dicts
-from dreamgraph.search import build_index, cheapest_owner, predict_relation
+from dreamgraph.search import build_index, cheapest_owner, is_correct, predict_relation
 from dreamgraph.store import ObjectStore
-from dreamgraph.world import apply_drift, generate_world, source_correct, source_endpoint
+from dreamgraph.world import apply_drift, edge_feedback, generate_world
 
 METHODS = (
     "dreamgraph",
@@ -109,11 +110,42 @@ def _greedy_update(good: dict[str, float], bad: dict[str, float], world, batch: 
         for source in SOURCES:
             good[source] *= GREEDY_DECAY
             bad[source] *= GREEDY_DECAY
-            if source_correct(world, rel_id, source):
+        for source, correct in edge_feedback(world, rel_id):
+            if correct:
                 good[source] += 1.0
             else:
                 bad[source] += 1.0
     return {source: (bad[source] + 1.0) / (good[source] + 1.0) for source in SOURCES}
+
+
+def _hops(prediction) -> int:
+    return max(0, len(prediction.path) - 1)
+
+
+def _load_block(use_hydra: bool, src: int) -> dict:
+    if not use_hydra:
+        return {
+            "backend": "memory",
+            "what": "In-process search. Re-run with DG_BACKEND=hydradb for engine latencies.",
+            "n": 0,
+            "clients": 0,
+            "p50_ms": 0.0,
+            "p95_ms": 0.0,
+            "p99_ms": 0.0,
+        }
+    from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
+
+    samples = concurrent_latencies(HYDRA_URL, HYDRA_TOKEN, src, rounds=30, clients=20)
+    return {
+        "backend": "hydradb",
+        "what": "20 concurrent clients, each issuing 30 weighted algo.SSpaths calls against the live node.",
+        "clients": 20,
+        "rounds_per_client": 30,
+        "n": len(samples),
+        "p50_ms": round(percentile(samples, 0.50), 4),
+        "p95_ms": round(percentile(samples, 0.95), 4),
+        "p99_ms": round(percentile(samples, 0.99), 4),
+    }
 
 
 def run_benchmark(
@@ -126,35 +158,37 @@ def run_benchmark(
     drift_iter: int = DRIFT_ITER,
     bootstrap: int = BOOTSTRAP,
 ) -> dict:
-    if BACKEND == "hydradb":
-        probe_path = ROOT / "results" / "probe.json"
-        live = False
-        if probe_path.exists():
-            import json
+    use_hydra = BACKEND == "hydradb"
+    hydra: HydraGraph | None = None
+    if use_hydra:
+        import json
+        import urllib.request
 
-            live = json.loads(probe_path.read_text()).get("live_engine") is True
+        probe_path = ROOT / "results" / "probe.json"
+        live = probe_path.exists() and json.loads(probe_path.read_text()).get("live_engine") is True
         if not live:
             raise SystemExit(
                 "DG_BACKEND=hydradb but results/probe.json does not have live_engine=true. "
-                "Run python scripts/probe_hydradb.py on a machine with Docker. "
-                "This bench will not silently score the in-process graph and call it HydraDB."
+                "Run python scripts/probe_hydradb.py."
             )
-        raise SystemExit(
-            "The live engine passed the probe, but the full multi-seed load path is still the "
-            "in-process graph. Re-run without DG_BACKEND=hydradb to refresh results/summary.json, "
-            "or extend dreamgraph.bench once you want every held-out query issued over HTTP."
-        )
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8443/healthz", timeout=3) as response:
+                if response.status != 200:
+                    raise SystemExit("HydraDB /healthz did not return 200")
+        except Exception as exc:  # noqa: BLE001
+            raise SystemExit(f"HydraDB is not answering on :8443 ({exc})") from exc
+        from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
 
-    outcomes: dict[str, list[list[list[int]]]] = {
-        method: [[] for _ in range(iters)] for method in METHODS
-    }
-    # outcomes[method][iteration_index][seed_index] = list of 0/1
+        hydra = HydraGraph(HYDRA_URL, HYDRA_TOKEN)
+
+    outcomes: dict[str, list[list[list[int]]]] = {method: [] for method in METHODS}
+    hop3: dict[str, list[list[list[int]]]] = {method: [] for method in METHODS}
     for method in METHODS:
-        for index in range(iters):
-            outcomes[method][index] = [[] for _ in seeds]
+        outcomes[method] = [[[] for _ in seeds] for _ in range(iters)]
+        hop3[method] = [[[] for _ in seeds] for _ in range(iters)]
 
-    latencies_ms: list[float] = []
     policies: list[dict] = []
+    load_src = 0
     per_seed_final_costs: list[dict] = []
     scoring_costs_last: dict[str, float] | None = None
     demo_world_seed = seeds[0]
@@ -163,8 +197,12 @@ def run_benchmark(
 
     for seed_index, seed in enumerate(seeds):
         world = generate_world(seed)
+        if hydra is not None:
+            print(f"loading seed {seed} into HydraDB", flush=True)
+            hydra.load(world)
         index = build_index(world.edges)
         rng = random.Random(10_000 + seed)
+        load_src = world.leaf[world.heldout_rels[0]]
         log: list[int] = []
         costs = {
             "dreamgraph": uniform_costs(),
@@ -181,22 +219,37 @@ def run_benchmark(
             if step == drift_iter:
                 apply_drift(world)
                 index = build_index(world.edges)
+                if hydra is not None:
+                    drifted_rels = [
+                        rel
+                        for rel in world.train_rels + world.heldout_rels
+                        if rel >= DRIFT_MIN_REL
+                    ]
+                    print(f"seed {seed} drift swap on {len(drifted_rels)} relations", flush=True)
+                    hydra.swap_drift_labels(drifted_rels)
             step_index = step - 1
 
             dict_edges = world.edges_as_dicts()
             dict_index = build_index(dict_edges)
 
-            def score(method: str, method_costs: dict[str, float] | None) -> list[int]:
+            def score(method: str, method_costs: dict[str, float] | None) -> tuple[list[int], list[int]]:
                 hits = []
-                use_index = dict_index if method == "dict_learner" else index
-                use_edges = dict_edges if method == "dict_learner" else world.edges
+                hops = []
+                via_hydra = hydra is not None and method not in {"dict_learner", "bm25"}
+                if via_hydra and method_costs is not None:
+                    hydra.stamp_source_costs(method_costs)
                 for rel_id in world.heldout_rels:
-                    started = time.perf_counter()
                     if method == "bm25":
-                        source = rank_sources(world, rel_id)
-                        person = source_endpoint(world, rel_id, source)
+                        person, sources = rank_chain(world, rel_id)
                         hit = person == world.gold[rel_id]
+                        hop_n = len(sources)
+                    elif via_hydra:
+                        prediction = hydra.owner(world, rel_id, method_costs)
+                        hit = is_correct(world, rel_id, prediction)
+                        hop_n = _hops(prediction)
                     else:
+                        use_index = dict_index if method == "dict_learner" else index
+                        use_edges = dict_edges if method == "dict_learner" else world.edges
                         prediction = cheapest_owner(
                             use_edges,
                             world.leaf[rel_id],
@@ -205,19 +258,22 @@ def run_benchmark(
                             use_index,
                         )
                         hit = prediction.person == world.gold[rel_id]
-                    if method == "dreamgraph" and seed == demo_world_seed:
-                        latencies_ms.append((time.perf_counter() - started) * 1000.0)
+                        hop_n = _hops(prediction)
                     hits.append(1 if hit else 0)
-                return hits
+                    hops.append(1 if hop_n >= 3 else 0)
+                return hits, hops
+
+            def take(method: str, method_costs: dict[str, float] | None) -> None:
+                hits, hops = score(method, method_costs)
+                outcomes[method][step_index][seed_index] = hits
+                hop3[method][step_index][seed_index] = hops
 
             # Score before any update on this iteration.
-            outcomes["unweighted"][step_index][seed_index] = score("unweighted", None)
-            outcomes["bm25"][step_index][seed_index] = score("bm25", None)
+            take("unweighted", None)
+            take("bm25", None)
             for method in ("dreamgraph", "hand_set", "one_shot", "greedy", "frozen_at_3"):
-                outcomes[method][step_index][seed_index] = score(method, costs[method])
-            outcomes["dict_learner"][step_index][seed_index] = score(
-                "dict_learner", costs["dict_learner"]
-            )
+                take(method, costs[method])
+            take("dict_learner", costs["dict_learner"])
             if seed == demo_world_seed and step == iters:
                 scoring_costs_last = dict(costs["dreamgraph"])
 
@@ -236,7 +292,7 @@ def run_benchmark(
                 return policy_accuracy(questions, world, proposed)
 
             def dict_refit(questions: list[int]) -> dict[str, float]:
-                return refit_costs_from_dicts(questions, edges, world.leaf, world.gold)
+                return refit_costs_from_dicts(questions, world.chains_as_dicts(), world.gold)
 
             def dict_score(questions: list[int], proposed: dict[str, float]) -> float:
                 return _dict_accuracy(questions, edges, world.leaf, world.gold, world.persons, proposed)
@@ -291,7 +347,16 @@ def run_benchmark(
             accuracy.append(round(point, 6))
             ci_low.append(round(low, 6))
             ci_high.append(round(high, 6))
-        series[method] = {"accuracy": accuracy, "ci_low": ci_low, "ci_high": ci_high}
+        hop_rates = []
+        for step_index in range(iters):
+            pooled = [bit for seed_rows in hop3[method][step_index] for bit in seed_rows]
+            hop_rates.append(round(sum(pooled) / len(pooled), 6) if pooled else 0.0)
+        series[method] = {
+            "accuracy": accuracy,
+            "ci_low": ci_low,
+            "ci_high": ci_high,
+            "hop3_rate": hop_rates,
+        }
 
     # Demo questions from seed 0's post-drift world, using the policy that
     # produced the last plotted point (the score at the final iteration).
@@ -314,8 +379,8 @@ def run_benchmark(
         "project": "dreamgraph",
         "version": __version__,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "backend": "memory",
-        "hydra_verified": False,
+        "backend": "hydradb" if use_hydra else "memory",
+        "hydra_verified": use_hydra,
         "synthetic_noise": True,
         "precomputed": True,
         "storage": "moto",
@@ -323,12 +388,15 @@ def run_benchmark(
         "export_path": "results/summary.json",
         "noise": {
             "description": (
-                "Synthetic source noise. Each vendor chain ends at the true owner "
-                "with a fixed probability. Drift swaps labels; it does not resimulate endpoints."
+                "Synthetic chain noise. The 3-hop chain usually names the true owner; "
+                "two 2-hop chains compete. Drift swaps wikidata and scraper labels and "
+                "does not move the people. The answer is the person at the end of the "
+                "minimum summed edge-cost path."
             ),
-            "p_correct_before_drift": P_CORRECT,
+            "chain_p_true": CHAIN_P_TRUE,
             "drift_min_rel": DRIFT_MIN_REL,
             "drift_effect": "wikidata and scraper labels exchange on rel_id >= drift_min_rel",
+            "path_cost": "sum of per-edge costs; each edge stores the learned cost of its current source",
         },
         "config": {
             "seeds": list(seeds),
@@ -351,14 +419,7 @@ def run_benchmark(
         "drift_iter": drift_iter,
         "policies": policies,
         "rollback_counts": {str(seed): count for seed, count in rollback_counts.items()},
-        "load": {
-            "backend": "memory",
-            "what": "In-process DreamGraph held-out searches on seed 0. These are not HydraDB network latencies.",
-            "n": len(latencies_ms),
-            "p50_ms": round(percentile(latencies_ms, 0.50), 6),
-            "p95_ms": round(percentile(latencies_ms, 0.95), 6),
-            "p99_ms": round(percentile(latencies_ms, 0.99), 6),
-        },
+        "load": _load_block(use_hydra, load_src),
         "demo": {
             "seed": demo_world_seed,
             "drift_applied": iters >= drift_iter,
@@ -377,8 +438,13 @@ def run_benchmark(
         ],
         "notes": [
             "Chart numbers are this document. The dashboard reads it; it does not embed a second copy.",
-            "backend=memory means Dijkstra ran in-process. HydraDB path calls are unverified until results/probe.json has live_engine=true.",
-            "The dict learner is the same refit over list[dict] edges. If its series matches DreamGraph, that is the measurement, not a bug to hide.",
+            (
+                "DreamGraph, unweighted, hand-set, one-shot, greedy, and frozen answers are algo.SSpaths "
+                "round trips. The dict learner is the same refit and the same sum, evaluated on plain dicts."
+                if use_hydra
+                else "backend=memory means Dijkstra ran in-process."
+            ),
+            "hop3_rate is the share of answers whose chosen path has 3 edges. Unweighted prefers the 2-hop chains.",
             "precomputed=true means the file is an export of the object written during this run.",
         ],
     }

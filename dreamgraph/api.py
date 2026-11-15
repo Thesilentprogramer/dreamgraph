@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import json
-import time
+import urllib.request
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from dreamgraph.bench import EXPORT, percentile
-from dreamgraph.config import SOURCES
-from dreamgraph.search import predict_relation
-from dreamgraph.world import apply_drift, generate_world, source_endpoint
+from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
+from dreamgraph.hydra_graph import HydraGraph, concurrent_latencies
+from dreamgraph.search import Prediction
+from dreamgraph.world import World, apply_drift, generate_world
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "web" / "dist"
@@ -44,8 +45,32 @@ def demo_world(document: dict):
     return _world_cache["world"]
 
 
-def _path_payload(world, rel_id: int, mode: str, costs: dict | None) -> dict:
-    prediction = predict_relation(world, rel_id, costs)
+def _hydra_up() -> bool:
+    try:
+        with urllib.request.urlopen(f"{HYDRA_URL}/healthz", timeout=2) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
+def _graph() -> HydraGraph:
+    graph = _world_cache.get("graph")
+    if graph is None:
+        graph = HydraGraph(HYDRA_URL, HYDRA_TOKEN)
+        _world_cache["graph"] = graph
+    return graph
+
+
+def _ensure_loaded(world: World) -> HydraGraph:
+    graph = _graph()
+    key = (world.seed, world.drifted, len(world.edges))
+    if _world_cache.get("loaded") != key:
+        graph.load(world)
+        _world_cache["loaded"] = key
+    return graph
+
+
+def _path_payload(world, rel_id: int, mode: str, costs: dict | None, prediction: Prediction) -> dict:
     nodes = [
         {
             "id": node_id,
@@ -60,15 +85,16 @@ def _path_payload(world, rel_id: int, mode: str, costs: dict | None) -> dict:
     ]
     gold = world.gold[rel_id]
     alternatives = []
-    for source in SOURCES:
-        person = source_endpoint(world, rel_id, source)
+    for chain in world.chains[rel_id]:
+        sources = tuple(world.edges[index].source for index in chain.edge_indexes)
         alternatives.append(
             {
-                "source": source,
-                "person": person,
-                "person_name": None if person is None else world.names.get(person),
-                "correct": person == gold,
-                "chosen": bool(prediction.sources) and prediction.sources[0] == source,
+                "source": " ".join(sources),
+                "hops": len(sources),
+                "person": chain.person,
+                "person_name": world.names.get(chain.person),
+                "correct": chain.person == gold,
+                "chosen": sources == prediction.sources,
             }
         )
     return {
@@ -85,13 +111,19 @@ def _path_payload(world, rel_id: int, mode: str, costs: dict | None) -> dict:
         "edges": edges,
         "alternatives": alternatives,
         "drift_applied": world.drifted,
-        "computed": "live",
+        "computed": "hydradb",
+        "procedure": "algo.SSpaths",
     }
 
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "dreamgraph", "results": EXPORT.exists()}
+    return {
+        "status": "ok",
+        "service": "dreamgraph",
+        "results": EXPORT.exists(),
+        "hydradb": _hydra_up(),
+    }
 
 
 @app.get("/api/results")
@@ -106,12 +138,18 @@ def query(
 ) -> dict:
     if mode not in {"dreamgraph", "unweighted"}:
         raise HTTPException(status_code=400, detail="mode must be dreamgraph or unweighted")
+    if not _hydra_up():
+        raise HTTPException(status_code=503, detail="HydraDB is not answering on :8443")
     document = load_results()
     world = demo_world(document)
     if rel not in world.leaf:
         raise HTTPException(status_code=404, detail=f"unknown relation {rel}")
     costs = None if mode == "unweighted" else document["demo"]["costs"]
-    return _path_payload(world, rel, mode, costs)
+    graph = _ensure_loaded(world)
+    if costs is not None:
+        graph.stamp_source_costs(costs)
+    prediction = graph.owner(world, rel, costs)
+    return _path_payload(world, rel, mode, costs, prediction)
 
 
 @app.get("/api/load")
@@ -120,23 +158,28 @@ def load(live: int = 0) -> dict:
     recorded = document["load"]
     if not live:
         return {"recorded": recorded, "live": None}
+    if not _hydra_up():
+        raise HTTPException(status_code=503, detail="HydraDB is not answering on :8443")
     world = demo_world(document)
-    costs = document["demo"]["costs"]
-    samples = world.heldout_rels[:300]
-    timings = []
-    for rel_id in samples:
-        started = time.perf_counter()
-        predict_relation(world, rel_id, costs)
-        timings.append((time.perf_counter() - started) * 1000.0)
+    graph = _ensure_loaded(world)
+    graph.stamp_source_costs(document["demo"]["costs"])
+    timings = concurrent_latencies(
+        HYDRA_URL,
+        HYDRA_TOKEN,
+        world.leaf[world.heldout_rels[0]],
+        rounds=15,
+        clients=20,
+    )
     return {
         "recorded": recorded,
         "live": {
-            "backend": "memory",
-            "what": "Live remeasure of DreamGraph searches on the drifted demo world.",
+            "backend": "hydradb",
+            "clients": 20,
+            "what": "Live remeasure: 20 concurrent clients calling weighted algo.SSpaths.",
             "n": len(timings),
-            "p50_ms": round(percentile(timings, 0.50), 6),
-            "p95_ms": round(percentile(timings, 0.95), 6),
-            "p99_ms": round(percentile(timings, 0.99), 6),
+            "p50_ms": round(percentile(timings, 0.50), 4),
+            "p95_ms": round(percentile(timings, 0.95), 4),
+            "p99_ms": round(percentile(timings, 0.99), 4),
         },
     }
 

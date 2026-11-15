@@ -203,7 +203,9 @@ export default function App() {
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
             <Pill tone="warn">Synthetic source noise</Pill>
-            <Pill>{results.backend === "memory" ? "In-process graph" : results.backend}</Pill>
+            <Pill tone={results.backend === "hydradb" ? "ok" : "neutral"}>
+              {results.backend === "hydradb" ? "HydraDB SSpaths" : "In-process graph"}
+            </Pill>
             <Pill tone={results.hydra_verified ? "ok" : "warn"}>
               {results.hydra_verified ? "HydraDB verified" : "HydraDB unverified"}
             </Pill>
@@ -227,7 +229,7 @@ export default function App() {
             <div>
               <h2 className="text-base font-semibold">Held-out accuracy</h2>
               <p className="text-sm text-muted">
-                {results.config.held_out} questions, {results.config.seeds.length} seeds. Bands are bootstrap 95% intervals. The marker is the label swap.
+                {results.config.held_out} questions, {results.config.seeds.length} seeds. Bands are bootstrap 95% intervals. The marker is the label swap. After recovery, DreamGraph’s answers are 3-hop paths; unweighted stays on 2 hops.
               </p>
             </div>
             <p className="text-xs text-muted">Precomputed export · {results.generated_at}</p>
@@ -270,7 +272,7 @@ export default function App() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold">Which owner does the path name?</h2>
-                <p className="text-sm text-muted">Computed on this request from the saved policy. Not a stored answer.</p>
+                <p className="text-sm text-muted">algo.SSpaths on the live node, from the saved edge costs. Not a stored answer.</p>
               </div>
               <div className="inline-flex rounded-lg border border-line bg-bg p-0.5" role="group" aria-label="Path mode">
                 {[
@@ -438,11 +440,11 @@ export default function App() {
         </Card>
       </main>
       <footer className="mx-auto max-w-6xl px-4 pb-8 text-xs leading-5 text-muted">
-        Source noise is synthetic: before the swap, a wikidata chain names the true owner 88% of the time, registry 72%, scraper 30%. Iteration {results.drift_iter} exchanges the wikidata and scraper labels on relations 15 and up. The dict learner uses the same update on plain Python dicts
+        Source noise is synthetic. The 3-hop chain names the true owner {pct(results.noise?.chain_p_true?.long)} of the time, the short trap {pct(results.noise?.chain_p_true?.trap)}, and the other short chain {pct(results.noise?.chain_p_true?.alt)}. Iteration {results.drift_iter} exchanges the wikidata and scraper labels. DreamGraph asks HydraDB for the minimum summed-cost path. The dict learner minimizes that same sum in process
         {results.series.dict_learner.accuracy.every((value, index) => value === results.series.dreamgraph.accuracy[index])
-          ? " and matched DreamGraph on this run."
+          ? " and matched these accuracies."
           : "."}{" "}
-        {results.notes?.[1]}
+        Unweighted never takes the 3-hop chain. {results.notes?.[1]}
       </footer>
     </div>
   );

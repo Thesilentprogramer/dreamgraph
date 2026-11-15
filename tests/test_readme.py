@@ -15,8 +15,9 @@ def test_readme_quotes_the_export_and_labels_the_noise():
     assert f"{dream[3] * 100:.1f}" in readme
     assert "synthetic" in readme.lower()
     assert "live_engine" in readme
-    assert "memory" in readme
+    assert "hydradb" in readme
     assert "Dict learner" in readme
+    assert "3-hop" in readme
     posts = (ROOT / "docs" / "POSTS.md").read_text()
     assert "@hydra_db" in posts
     assert "Not posted" in posts

@@ -6,34 +6,30 @@ DreamGraph picks a beneficial-owner path through a multi-vendor entity graph, th
 
 ## What the run actually did
 
-The numbers below are copied from [`results/summary.json`](results/summary.json), produced by `python -m dreamgraph.bench`. They are not typed in by hand. The noise model is **synthetic**: before any swap, a wikidata chain names the true owner with probability 0.88, registry 0.72, scraper 0.30. There is no live corporate registry in this repo.
+The numbers below are copied from [`results/summary.json`](results/summary.json), produced by `DG_BACKEND=hydradb python -m dreamgraph.bench`. They are not typed in by hand. The noise model is **synthetic**: each company has a 3-hop chain that names the true owner 90% of the time, a 2-hop trap that is right 20% of the time, and another 2-hop chain that is right 45% of the time. There is no live corporate registry in this repo.
 
-The chart is a **precomputed export**. The benchmark wrote the document to an in-process S3 bucket (moto) and exported that object to `results/summary.json`. The query box does not read a stored answer; it walks the regenerated world on the request.
+The chart is a **precomputed export**. The benchmark wrote the document through moto and copied that object to `results/summary.json`. The query box does not read a stored answer. It calls `algo.SSpaths` on the running node.
 
-**Backend of this file: `memory`.** Dijkstra ran in-process. `results/probe.json` has `"live_engine": false` because this machine had no Docker, so `algo.SSpaths` / `algo.SPpaths` were **not** executed against `ghcr.io/hydra-db/hydradb:0.4.0`. The client, the Cypher, and the probe script are in the repo. They are not a substitute for a green probe.
+**Backend of this file: `hydradb`.** `results/probe.json` has `"live_engine": true`. DreamGraph, the unweighted walk, hand-set costs, the one-shot fit, greedy, and the frozen model all took their held-out answers from weighted or unweighted `algo.SSpaths` against `ghcr.io/hydra-db/hydradb:0.4.0` running natively on moto (Docker was not installed; `CLOUD_PROVIDER=local` rejects updates). The dict learner is the ablation: the same refit and the same sum, on plain dicts, with no engine round trip.
 
-Held-out accuracy, percent, 300 questions, seeds 0, 1, and 2. Iteration 4 is the label swap, scored **before** that iteration's update.
+Held-out accuracy, percent, 300 questions, seeds 0, 1, and 2. Iteration 4 is the label swap, scored **before** that iteration's update. `hop3` is the share of answers whose chosen path has 3 edges.
 
-| Method | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| DreamGraph | 63.0 | 85.0 | 80.4 | 47.0 | 76.4 | 80.4 | 80.4 | 80.4 |
-| Dict learner | 63.0 | 85.0 | 80.4 | 47.0 | 76.4 | 80.4 | 80.4 | 80.4 |
-| Unweighted | 63.0 | 63.0 | 63.0 | 63.0 | 63.0 | 63.0 | 63.0 | 63.0 |
-| Hand-set costs | 85.0 | 85.0 | 85.0 | 33.8 | 33.8 | 33.8 | 33.8 | 33.8 |
-| One-shot fit | 63.0 | 85.0 | 85.0 | 33.8 | 33.8 | 33.8 | 33.8 | 33.8 |
-| Greedy online | 63.0 | 80.4 | 81.4 | 33.8 | 72.9 | 80.4 | 80.4 | 81.4 |
-| BM25 labels | 85.0 | 85.0 | 85.0 | 33.8 | 33.8 | 33.8 | 33.8 | 33.8 |
-| Frozen after 3 | 63.0 | 85.0 | 80.4 | 47.0 | 47.0 | 47.0 | 47.0 | 47.0 |
+| Method | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | hop3 at 8 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| DreamGraph | 20.7 | 90.6 | 90.6 | 45.9 | 90.6 | 90.6 | 90.6 | 90.6 | 1.00 |
+| Dict learner | 20.7 | 90.6 | 90.6 | 45.9 | 90.6 | 90.6 | 90.6 | 90.6 | 1.00 |
+| Unweighted | 20.7 | 20.7 | 20.7 | 20.7 | 20.7 | 20.7 | 20.7 | 20.7 | 0.00 |
+| Hand-set costs | 90.6 | 90.6 | 90.6 | 45.9 | 45.9 | 45.9 | 45.9 | 45.9 | 0.00 |
+| One-shot fit | 20.7 | 90.6 | 90.6 | 45.9 | 45.9 | 45.9 | 45.9 | 45.9 | 0.00 |
+| Greedy online | 20.7 | 90.6 | 90.6 | 45.9 | 60.7 | 76.3 | 74.9 | 61.6 | 0.33 |
+| BM25 labels | 90.6 | 90.6 | 90.6 | 57.0 | 57.0 | 57.0 | 57.0 | 57.0 | 0.00 |
+| Frozen after 3 | 20.7 | 90.6 | 90.6 | 45.9 | 45.9 | 45.9 | 45.9 | 45.9 | 0.00 |
 
-DreamGraph's iteration-8 mean is 80.4%, stratified bootstrap 95% interval **77.7–82.9**. At the drift score the interval is **44.0–50.0** around 47.0. Frozen after iteration 3 stays at 47.0. Hand-set costs, BM25, and the one-shot fit fall to 33.8 and stay there, because they still prefer the label `wikidata` after that label has been moved onto the noisy chains.
+DreamGraph's iteration-8 mean is 90.6%, stratified bootstrap 95% interval **88.4–92.4**. At the drift score the interval is **42.6–49.0** around 45.9. Every recovered DreamGraph answer is the 3-hop chain: the sum of three learned edge costs beat both 2-hop chains. Unweighted search, which only counts hops, stays at 20.7% and its 3-hop rate stays 0. That is the composition result.
 
-The dict learner is the same refit over `list[dict]` edges and its own Dijkstra. It **matches DreamGraph on every iteration**. That is the measurement. HydraDB is the path engine, not a second learning rule, and this run did not ask the engine to search.
+The dict learner **matches DreamGraph's accuracies on every iteration**. Same objective, different place the sum runs. The gap that is not zero is latency, and the methods that do not recompute the full sum. Greedy, with decay and no window, ends at 61.6% and a 3-hop rate of 0.33. Hand-set costs, the one-shot fit, and the model frozen after iteration 3 stay at 45.9% after the swap and stop taking the long chain. BM25 stays at 57.0%. This run's guard did not roll a refit back.
 
-Greedy online updates (decay 0.85, no window, no guard) also recover, on a slightly different path. With this source gap, a short memory is enough. The window still matters for the guard: seed 2 rolled a refit back at iterations 4 and 5 because the guard slice got worse, then accepted a later refit. Those two `PolicyVersion` rows are in the JSON with `"rolled_back": true`. Seeds 0 and 1 did not roll back.
-
-Unweighted search is flat at 63.0%. Drift swaps labels, not endpoints, and the tie break is the path's node ids, so the unweighted choice does not move.
-
-In-process search latency on seed 0, n = 2400: p50 6.5 µs, p95 8.0 µs, p99 9.5 µs (`load` in the JSON, milliseconds × 1000). That is not a HydraDB round trip. Do not quote it as one.
+Concurrent load, 20 clients, 30 weighted `algo.SSpaths` calls each (n = 600): p50 **6.33 ms**, p95 **12.56 ms**, p99 **15.88 ms**. Those are engine round trips.
 
 ## Architecture
 
@@ -77,14 +73,14 @@ cd web && npm install && npm run build && cd ..
 make serve          # http://127.0.0.1:8000
 ```
 
-`make probe` records the registry digest and, without Docker, exits 2. That exit is not a pass. With Docker:
+`make probe` runs the live checks. Without Docker it starts the extracted `graph-node` against moto (`scripts/run_hydradb_native.sh`). `CLOUD_PROVIDER=local` is not usable for this workload: the local object store rejects `PutMode::Update`. With Docker:
 
 ```bash
 python scripts/probe_hydradb.py
 docker compose --profile engine up
 ```
 
-`DG_BACKEND=hydradb make bench` refuses to run unless `results/probe.json` has `"live_engine": true`, and even then it stops rather than pretend the in-process numbers were served by HydraDB. Wiring every held-out query through HTTP is left as a follow-up once the probe is green. Do not flip the JSON's `backend` field by hand.
+`DG_BACKEND=hydradb make bench` is how `results/summary.json` was produced. It refuses to start unless `results/probe.json` has `"live_engine": true` and `http://127.0.0.1:8443/healthz` answers. It does not fall back to the in-process graph.
 
 The dashboard:
 
@@ -115,12 +111,12 @@ Not from a local `docker image inspect`. Re-check after a pull.
 
 ## Limitations
 
-- The world is a pile of disjoint two-hop gadgets. A real ownership graph has shared people, cycles, and edges the generator did not intend. Those are not in this measurement.
-- Source noise is a fixed coin flip, not a scrape.
-- The dict learner tying DreamGraph means the update rule does not need HydraDB. The engine still has to be the thing that walks the weighted path before this is a HydraDB result. That walk was not run here.
-- `pathCount` is treated as a total cap because TrailMend measured it that way. Upstream docs still say it is per pair. The live probe is the check, and it did not run.
-- Greedy recovers too. The window and the guard are not the only story on a gap this wide; the guard's real effect in this run is the two seed-2 rollbacks, which delay that seed.
-- Latency figures are in-process. They will move a little if you re-time them. Accuracy will not, for these seeds.
+- The world is disjoint competing chains, not a shared corporate registry. People are not reused across companies.
+- Source noise is a fixed coin flip per chain, not a scrape.
+- The dict learner ties DreamGraph because both minimize the same edge-cost sum. HydraDB is what evaluated that sum for every DreamGraph answer in this file. The tie is the measurement. Unweighted search, which does not, never selects the 3-hop chain.
+- `pathCount` is still sized as a total cap. On a single source the probe's `pathCount: 2` returned 2 rows. That does not separate a per-pair reading from a total cap. The client sets `resultLimit` to the same total anyway.
+- Greedy only partly recovers. The window is what puts the 3-hop rate back to 1.00. The guard did not fire on these three seeds.
+- Latency will move if you re-time it. The accuracy series will not, for these seeds.
 - No authentication, no multi-tenant graph, no production bucket was created.
 
 ## Layout

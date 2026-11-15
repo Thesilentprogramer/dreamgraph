@@ -13,7 +13,8 @@ def test_health_and_results_come_from_the_export():
     assert results.status_code == 200
     body = results.json()
     assert body["series"]["dreamgraph"]["accuracy"]
-    assert body["backend"] == "memory"
+    assert body["backend"] == "hydradb"
+    assert body["hydra_verified"] is True
     assert body["synthetic_noise"] is True
 
 
@@ -23,8 +24,9 @@ def test_query_toggle_changes_the_path_on_a_disagreement():
     learned = client.get("/api/query", params={"rel": rel, "mode": "dreamgraph"})
     plain = client.get("/api/query", params={"rel": rel, "mode": "unweighted"})
     assert learned.status_code == plain.status_code == 200
-    assert learned.json()["person"] != plain.json()["person"]
-    assert learned.json()["computed"] == "live"
+    assert learned.json()["computed"] == "hydradb"
+    assert learned.json()["procedure"] == "algo.SSpaths"
+    assert len(learned.json()["path"]) != len(plain.json()["path"]) or learned.json()["person"] != plain.json()["person"]
     assert learned.json()["path"][0]["kind"] == "company"
     assert learned.json()["path"][-1]["kind"] == "person"
     assert learned.json()["drift_applied"] is True
@@ -36,5 +38,6 @@ def test_live_load_returns_percentiles():
     payload = client.get("/api/load", params={"live": 1}).json()
     live = payload["live"]
     assert live["n"] == 300
+    assert live["backend"] == "hydradb"
     assert live["p50_ms"] <= live["p95_ms"] <= live["p99_ms"]
     assert payload["recorded"]["n"] > 0
