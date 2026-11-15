@@ -1,0 +1,20 @@
+# One web service. The image starts moto, HydraDB 0.4.0, and the dashboard.
+# Render sets PORT. /healthz returns 200 only after graph-node answers.
+# Change plan to 1c-2g if the seed is OOM-killed on 512 MB.
+
+services:
+  - type: web
+    name: dreamgraph
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: HYDRADB_AUTH_TOKEN
+        generateValue: true
+      - key: DG_SEED_ON_BOOT
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"

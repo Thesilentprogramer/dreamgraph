@@ -52,9 +52,14 @@ services:
       - "8443:8443"
       - "7687:7687"
       - "9090:9090"
-    volumes:
-      - ./deploy/auth-token:/auth/token:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        umask 077
+        printf '%s\n' "$${HYDRADB_AUTH_TOKEN}" > /tmp/auth-token
+        exec /usr/local/bin/graph-node
     environment:
+      HYDRADB_AUTH_TOKEN: local-development-token-32-bytes
       CLOUD_PROVIDER: aws
       AWS_BUCKET_NAME: dreamgraph
       AWS_DEFAULT_REGION: us-east-1
@@ -64,7 +69,7 @@ services:
       AWS_SECRET_ACCESS_KEY: testing
       AWS_EC2_METADATA_DISABLED: "true"
       GRAPH_ALLOW_PLAINTEXT: "true"
-      GRAPH_AUTH_TOKEN_FILE: /auth/token
+      GRAPH_AUTH_TOKEN_FILE: /tmp/auth-token
       GRAPH_DATA_CACHE_DIR: /var/cache/slatedb
       GRAPH_NAMESPACE: default
       GRAPH_ID: default

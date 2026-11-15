@@ -5,6 +5,14 @@ from dreamgraph.api import app
 client = TestClient(app)
 
 
+def test_healthz_reports_the_engine():
+    response = client.get("/healthz")
+    assert response.status_code in (200, 503)
+    body = response.json()
+    assert "hydradb" in body
+    assert "live_engine" in body
+
+
 def test_health_and_results_come_from_the_export():
     health = client.get("/api/health")
     assert health.status_code == 200

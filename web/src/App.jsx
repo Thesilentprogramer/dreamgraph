@@ -58,6 +58,7 @@ export default function App() {
   const [seedFilter, setSeedFilter] = useState("all");
   const [liveLoad, setLiveLoad] = useState(null);
   const [liveBusy, setLiveBusy] = useState(false);
+  const [engine, setEngine] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +84,26 @@ export default function App() {
       });
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const response = await fetch("/api/health");
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!cancelled) setEngine(body);
+      } catch {
+        if (!cancelled) setEngine({ live_engine: false, hydradb: false });
+      }
+    }
+    poll();
+    const timer = setInterval(poll, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
     };
   }, []);
 
@@ -206,8 +227,15 @@ export default function App() {
             <Pill tone={results.backend === "hydradb" ? "ok" : "neutral"}>
               {results.backend === "hydradb" ? "HydraDB SSpaths" : "In-process graph"}
             </Pill>
+            <Pill tone={engine?.live_engine ? "ok" : "warn"}>
+              {engine?.seeding
+                ? "Seeding HydraDB"
+                : engine?.live_engine
+                  ? "Live engine"
+                  : "Engine down"}
+            </Pill>
             <Pill tone={results.hydra_verified ? "ok" : "warn"}>
-              {results.hydra_verified ? "HydraDB verified" : "HydraDB unverified"}
+              {results.hydra_verified ? "Benchmark on HydraDB" : "Benchmark unverified"}
             </Pill>
           </div>
         </div>

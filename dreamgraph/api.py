@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 import urllib.request
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from dreamgraph.bench import EXPORT, percentile
 from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
@@ -18,9 +21,43 @@ from dreamgraph.world import World, apply_drift, generate_world
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "web" / "dist"
 
-app = FastAPI(title="DreamGraph", version="0.1.0")
-
 _world_cache: dict = {}
+_load_lock = threading.Lock()
+_boot = {"seeding": False, "seeded": False, "error": None}
+
+
+def _seed_on_boot() -> None:
+    """Load the demo world into HydraDB after the process is listening."""
+
+    _boot["seeding"] = True
+    _boot["error"] = None
+    try:
+        for _ in range(90):
+            if _hydra_up():
+                break
+            threading.Event().wait(1)
+        else:
+            _boot["error"] = "HydraDB did not open /healthz"
+            return
+        document = load_results()
+        world = demo_world(document)
+        graph = _ensure_loaded(world)
+        graph.stamp_source_costs(document["demo"]["costs"])
+        _boot["seeded"] = True
+    except Exception as exc:  # noqa: BLE001 — surfaced on /api/health
+        _boot["error"] = str(exc)
+    finally:
+        _boot["seeding"] = False
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    if os.environ.get("DG_SEED_ON_BOOT") == "1":
+        threading.Thread(target=_seed_on_boot, name="dreamgraph-seed", daemon=True).start()
+    yield
+
+
+app = FastAPI(title="DreamGraph", version="0.1.0", lifespan=_lifespan)
 
 
 def load_results() -> dict:
@@ -64,9 +101,11 @@ def _graph() -> HydraGraph:
 def _ensure_loaded(world: World) -> HydraGraph:
     graph = _graph()
     key = (world.seed, world.drifted, len(world.edges))
-    if _world_cache.get("loaded") != key:
-        graph.load(world)
-        _world_cache["loaded"] = key
+    with _load_lock:
+        if _world_cache.get("loaded") != key:
+            graph.load(world)
+            _world_cache["loaded"] = key
+            _boot["seeded"] = True
     return graph
 
 
@@ -116,13 +155,35 @@ def _path_payload(world, rel_id: int, mode: str, costs: dict | None, prediction:
     }
 
 
+@app.get("/healthz")
+def healthz():
+    """Render health check. 200 only after HydraDB itself answers."""
+
+    up = _hydra_up()
+    body = {
+        "status": "ok" if up else "starting",
+        "hydradb": up,
+        "live_engine": up,
+        "seeded": _boot["seeded"],
+        "seeding": _boot["seeding"],
+    }
+    if not up:
+        return JSONResponse(body, status_code=503)
+    return body
+
+
 @app.get("/api/health")
 def health() -> dict:
+    up = _hydra_up()
     return {
-        "status": "ok",
+        "status": "ok" if up else "starting",
         "service": "dreamgraph",
         "results": EXPORT.exists(),
-        "hydradb": _hydra_up(),
+        "hydradb": up,
+        "live_engine": up,
+        "seeded": _boot["seeded"],
+        "seeding": _boot["seeding"],
+        "seed_error": _boot["error"],
     }
 
 
