@@ -1,0 +1,21 @@
+{
+  "digest": {
+    "image": "ghcr.io/hydra-db/hydradb:0.4.0",
+    "index_digest": "sha256:ab71d651fefee13ebb23eb56d72316065bdca563ff7587442e07be663f2bf880",
+    "note": "A pulled image's RepoDigests entry is the local confirmation. This record is the registry index only.",
+    "platforms": {
+      "linux/amd64": "sha256:e837db24b4c11eba759001aa6143bd7415a4fe811045831f83b6b03eec8a4bb5",
+      "linux/arm64": "sha256:64fa5979c940f7b97fa8fdac8131e4adbeec84687dac0686a8342248953ea782"
+    },
+    "source": "registry-https"
+  },
+  "docker": false,
+  "image": "ghcr.io/hydra-db/hydradb:0.4.0",
+  "live_engine": false,
+  "message": "Docker is not on PATH. Registry digest lookup is not a live engine check. See docs/HYDRA_RUNBOOK.md.",
+  "path_budget_contract": {
+    "pathCount": 4,
+    "resultLimit": 4
+  },
+  "status": "skipped_no_docker"
+}
