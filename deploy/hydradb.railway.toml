@@ -1,0 +1,15 @@
+# Second Railway service. Set the source to the image, not this repo's Dockerfile.
+#
+#   ghcr.io/hydra-db/hydradb:0.4.0
+#   index digest:       sha256:ab71d651fefee13ebb23eb56d72316065bdca563ff7587442e07be663f2bf880
+#   linux/amd64 digest: sha256:e837db24b4c11eba759001aa6143bd7415a4fe811045831f83b6b03eec8a4bb5
+#
+# Public HTTP targets 8443. Do not bind this service to 8000; the app owns 8000.
+# Health check path is /healthz on the query port. /readyz is on 9090 and returns an empty 200.
+# Attach a Railway bucket and copy deploy/hydradb.env.example. The cache disk is disposable.
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

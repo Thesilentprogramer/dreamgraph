@@ -1,0 +1,76 @@
+# Dashboard alone: docker compose up --build app
+# Engine stack:  docker compose --profile engine up --build
+# The engine profile was not started in the environment that committed this file.
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      HOST: "0.0.0.0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  moto:
+    profiles: ["engine"]
+    image: motoserver/moto:latest
+    ports:
+      - "4566:5000"
+
+  bucket-init:
+    profiles: ["engine"]
+    image: amazon/aws-cli:2.17.0
+    depends_on:
+      - moto
+    environment:
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        i=0
+        until aws s3 mb s3://dreamgraph --endpoint-url http://moto:5000; do
+          i=$$((i+1))
+          if [ "$$i" -gt 30 ]; then exit 1; fi
+          sleep 1
+        done
+
+  hydra:
+    profiles: ["engine"]
+    image: ghcr.io/hydra-db/hydradb:0.4.0
+    depends_on:
+      bucket-init:
+        condition: service_completed_successfully
+    ports:
+      - "8443:8443"
+      - "7687:7687"
+      - "9090:9090"
+    volumes:
+      - ./deploy/auth-token:/auth/token:ro
+    environment:
+      CLOUD_PROVIDER: aws
+      AWS_BUCKET_NAME: dreamgraph
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ALLOW_HTTP: "true"
+      AWS_ENDPOINT: http://moto:5000
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_EC2_METADATA_DISABLED: "true"
+      GRAPH_ALLOW_PLAINTEXT: "true"
+      GRAPH_AUTH_TOKEN_FILE: /auth/token
+      GRAPH_DATA_CACHE_DIR: /var/cache/slatedb
+      GRAPH_NAMESPACE: default
+      GRAPH_ID: default
+      GRAPH_CELL_ID: cell-0
+      GRAPH_CELLS: cell-0
+      GRAPH_NODE_ID: node-0
+      GRAPH_BOLT_NODE_ADDRESSES: node-0=0.0.0.0:7687
+      GRAPH_ADVERTISED_BOLT_ADDR: 127.0.0.1:7687
+      RUST_MIN_STACK: "33554432"
