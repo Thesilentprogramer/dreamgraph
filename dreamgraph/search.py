@@ -19,15 +19,19 @@ class Prediction:
     sources: tuple[str, ...]
     weight: float
 
-def _adjacency(edges: list[Edge] | list[dict]) -> dict[int, list[tuple[int, str]]]:
+def build_index(edges: list[Edge] | list[dict]) -> tuple[dict[int, list[tuple[int, str]]], dict[tuple[int, int], str]]:
+    """Adjacency plus a (src, dst) → source lookup. Rebuild after a label swap."""
+
     adj: dict[int, list[tuple[int, str]]] = {}
+    lookup: dict[tuple[int, int], str] = {}
     for edge in edges:
         if isinstance(edge, Edge):
             src, dst, source = edge.src, edge.dst, edge.source
         else:
-            src, dst, source = edge["src"], edge["dst"], edge["source"]
+            src, dst, source = int(edge["src"]), int(edge["dst"]), edge["source"]
         adj.setdefault(src, []).append((dst, source))
-    return adj
+        lookup[(src, dst)] = source
+    return adj, lookup
 
 
 def cheapest_owner(
@@ -35,6 +39,7 @@ def cheapest_owner(
     src: int,
     persons: set[int],
     costs: dict[str, float] | None,
+    index: tuple[dict[int, list[tuple[int, str]]], dict[tuple[int, int], str]] | None = None,
 ) -> Prediction:
     """Min-cost path from ``src`` that ends on a person.
 
@@ -42,7 +47,9 @@ def cheapest_owner(
     an edge weighs ``costs[source]``. Ties break on the path's node-id tuple.
     """
 
-    adj = _adjacency(edges)
+    if index is None:
+        index = build_index(edges)
+    adj, lookup = index
     start = (0.0, (src,))
     best: dict[int, tuple[float, tuple[int, ...]]] = {src: start}
     heap: list[tuple[float, tuple[int, ...], int]] = [(0.0, (src,), src)]
@@ -71,12 +78,6 @@ def cheapest_owner(
     if chosen is None or person is None:
         return Prediction(None, (src,), (), float("inf"))
 
-    lookup = {}
-    for edge in edges:
-        if isinstance(edge, Edge):
-            lookup[(edge.src, edge.dst)] = edge.source
-        else:
-            lookup[(edge["src"], edge["dst"])] = edge["source"]
     sources = tuple(lookup[(chosen[1][i], chosen[1][i + 1])] for i in range(len(chosen[1]) - 1))
     return Prediction(person, chosen[1], sources, chosen[0])
 
