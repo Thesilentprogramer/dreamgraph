@@ -20,7 +20,8 @@ def test_readme_quotes_the_export_and_labels_the_noise():
     assert "3-hop" in readme
     assert "Zenodo" in readme
     assert "H12" in readme
-    assert "FAIL" in readme
+    assert "PASS" in readme
+    assert "68.2" in readme
     assert "15 rollbacks" in readme
     posts = (ROOT / "docs" / "POSTS.md").read_text()
     assert "@hydra_db" in posts

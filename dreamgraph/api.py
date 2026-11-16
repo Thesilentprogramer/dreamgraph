@@ -294,7 +294,10 @@ def query(
         prediction = graph.voted_owner(world, rel, k=int(vote_spec["k"]), margin=vote_spec.get("margin"))
     else:
         prediction = graph.owner(world, rel, costs)
-    return _path_payload(world, rel, mode, costs, prediction)
+    payload = _path_payload(world, rel, mode, costs, prediction)
+    if vote_spec and costs is not None:
+        payload["procedure"] = "algo.SPpaths"
+    return payload
 
 
 @app.get("/api/load")

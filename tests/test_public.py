@@ -73,8 +73,10 @@ def test_hypothesis_verdicts_match_the_evidence_files():
         (item["id"], item["verdict"]) for item in on_disk
     ]
     assert poison["rollback_count"] == len(poison["receipts"]) == 15
-    assert vuln_poison["rollback_count"] == len(vuln_poison["receipts"]) == 11
-    assert any(item["id"] == "H12" and item["verdict"] == "FAIL" for item in verdicts)
+    assert vuln_poison["rollback_count"] == len(vuln_poison["receipts"]) == 13
+    assert vuln_poison["rollback_counts"]["2"] >= 1
+    assert any(item["id"] == "H12" and item["verdict"] == "PASS" for item in verdicts)
+    assert any(item["id"] == "H13" and item["verdict"] == "PASS" for item in verdicts)
     assert vuln["drift"]["kind"] == "real"
     assert published["series"]["dreamgraph"]["accuracy"] == one_hop["series"]["dreamgraph"]["accuracy"]
     assert one_hop["matches_published_dreamgraph"] is True

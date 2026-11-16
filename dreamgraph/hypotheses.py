@@ -160,7 +160,7 @@ STATEMENTS = (
             "within 0.08 of DreamGraph, because the poison starts at iteration 4."
         ),
     },
-)
+) + PREREGISTERED
 
 
 def _spearman(xs: list[float], ys: list[float]) -> float:
@@ -246,7 +246,13 @@ def evaluate(published: dict, one_hop: dict, vuln: dict, poison: dict, vuln_pois
         "H10": f"rollbacks {v_roll}, dreamgraph minus naive {v_gap:.4f}",
         "H11": f"receipts {len(v_receipts)} well-formed {v_ok}",
         "H12": f"absolute frozen gap {v_frozen:.4f}",
+        "H13": f"dreamgraph minus nvd_only {_gap(vuln['series'], 'dreamgraph', 'nvd_only'):.4f}",
+        "H14": f"margin vote minus open top-5 {_gap(vuln['series'], 'dreamgraph', 'topk_open'):.4f}",
+        "H15": f"conditional k=1 minus per-feed {_gap(vuln['series'], 'conditional_k1', 'per_feed'):.4f}",
+        "H16": f"rollbacks per seed {vuln_poison.get('rollback_counts')}",
     }
+    seed_counts = vuln_poison.get("rollback_counts") or {}
+    every_seed = bool(seed_counts) and all(int(value) >= 1 for value in seed_counts.values())
     passed = {
         "H1": replay_gap >= 0.10,
         "H2": hop_gap >= 0.50,
@@ -260,6 +266,10 @@ def evaluate(published: dict, one_hop: dict, vuln: dict, poison: dict, vuln_pois
         "H10": v_roll >= 3 and v_gap >= 0.05,
         "H11": v_ok and len(v_receipts) == v_roll,
         "H12": v_frozen <= 0.08,
+        "H13": _gap(vuln["series"], "dreamgraph", "nvd_only") >= 0.01,
+        "H14": _gap(vuln["series"], "dreamgraph", "topk_open") >= 0.01,
+        "H15": _gap(vuln["series"], "conditional_k1", "per_feed") >= 0.01,
+        "H16": every_seed,
     }
     items = []
     for spec in STATEMENTS:

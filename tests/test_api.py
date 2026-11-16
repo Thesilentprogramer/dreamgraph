@@ -54,7 +54,7 @@ def test_vuln_query_matches_the_in_process_sum():
     assert learned.status_code == 200
     body = learned.json()
     assert body["computed"] == "hydradb"
-    assert body["procedure"] == "algo.SSpaths"
+    assert body["procedure"] == ("algo.SPpaths" if document["vuln"]["demo"].get("vote") else "algo.SSpaths")
     assert body["dataset"] == "vuln"
     assert body["path"][0]["kind"] == "question"
     assert body["path"][-1]["kind"] == "verdict"

@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dreamgraph.hydra_client import (
     HttpTransport,
     HydraClient,
+    build_sp_paths,
     build_ss_paths,
     cell_value,
 )
@@ -143,10 +144,35 @@ class HydraGraph:
         return found
 
     def voted_owner(self, world: World, rel_id: int, *, k: int, margin: float | None) -> Prediction:
+        """Vote the verdict paths ``algo.SPpaths`` returned.
+
+        A single ``SSpaths`` budget of ``k`` is filled by the cheaper one-hop
+        edges, so each verdict is its own call with ``pathCount`` = ``k``.
+        """
+
         from dreamgraph.search import combine_ends
 
-        found = self.ranked_paths(world, rel_id, k=k)
-        chosen, weight = combine_ends([(item[0], item[1]) for item in found], k=k, margin=margin)
+        targets = sorted({chain.person for chain in world.chains.get(rel_id, [])})
+        found = []
+        for dst in targets:
+            cypher, params = build_sp_paths(
+                src=world.leaf[rel_id],
+                dst=dst,
+                weighted=True,
+                total=k,
+                max_len=3,
+                rel_types=["OWNS"],
+            )
+            for row in self.client.rows(cypher, params):
+                path = row[0]
+                if not isinstance(path, dict):
+                    continue
+                nodes = tuple(int(node["id"]) for node in path["nodes"])
+                if len(nodes) < 2 or nodes[-1] != dst:
+                    continue
+                sources = tuple(rel["properties"].get("source", "") for rel in path["relationships"])
+                found.append((float(row[1]), nodes[-1], nodes, sources))
+        chosen, _weight = combine_ends([(item[0], item[1]) for item in found], k=k, margin=margin)
         if chosen is None:
             return Prediction(None, (world.leaf[rel_id],), (), float("inf"))
         match = min((item for item in found if item[1] == chosen), key=lambda item: (item[0], item[2]))
