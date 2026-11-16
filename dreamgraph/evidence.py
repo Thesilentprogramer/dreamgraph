@@ -548,27 +548,56 @@ def merge_summary(published: dict, one_hop: dict, public: dict, poison: dict, hy
     return published
 
 
+VULN_PATH = ROOT / "results" / "vuln_summary.json"
+VULN_POISON_PATH = ROOT / "results" / "vuln_poison.json"
+
+
 def main() -> None:
+    from dreamgraph.vuln_bench import run_vuln, run_vuln_poison
+
     published = json.loads(EXPORT.read_text())
-    one_hop = replay_one_hop()
-    published_dream = published["series"]["dreamgraph"]["accuracy"]
-    replay_dream = one_hop["series"]["dreamgraph"]["accuracy"]
-    diff = max(abs(float(a) - float(b)) for a, b in zip(published_dream, replay_dream))
-    one_hop["matches_published_dreamgraph"] = diff < 0.005
-    one_hop["max_abs_diff_vs_published"] = round(diff, 6)
-    public = run_book()
-    poison = run_poison()
-    hypotheses = evaluate(published, one_hop, public, poison)
-    _write(ONE_HOP_PATH, one_hop)
-    _write(PUBLIC_PATH, public)
-    _write(POISON_PATH, poison)
+    dream = list(published["series"]["dreamgraph"]["accuracy"])
+    one_hop = json.loads(ONE_HOP_PATH.read_text())
+    poison = json.loads(POISON_PATH.read_text())
+    vuln = run_vuln()
+    vuln_poison = run_vuln_poison()
+    hypotheses = evaluate(published, one_hop, vuln, poison, vuln_poison)
+    _write(VULN_PATH, vuln)
+    _write(VULN_POISON_PATH, vuln_poison)
     _write(HYPOTHESIS_PATH, {"items": hypotheses})
-    merged = merge_summary(published, one_hop, public, poison, hypotheses)
-    _write(EXPORT, merged)
+    published.pop("public", None)
+    published["vuln"] = vuln
+    published["vuln_poison"] = {
+        key: vuln_poison[key]
+        for key in (
+            "scenario",
+            "poison_iter",
+            "poison_source",
+            "poison_false_friend",
+            "config",
+            "methods",
+            "series",
+            "receipts",
+            "policies",
+            "rollback_count",
+            "rollback_counts",
+        )
+        if key in vuln_poison
+    }
+    published["hypotheses"] = hypotheses
+    published["evidence_generated_at"] = datetime.now(timezone.utc).isoformat()
+    if "ablations" not in published:
+        published["ablations"] = {}
+    published["ablations"]["vuln"] = {
+        method: vuln["series"][method]["accuracy"][-1] for method in vuln["methods"]
+    }
+    if published["series"]["dreamgraph"]["accuracy"] != dream:
+        raise RuntimeError("evidence merge changed the published DreamGraph series")
+    _write(EXPORT, published)
     for item in hypotheses:
         print(f"{item['id']} {item['verdict']} {item['observed']}", flush=True)
-    print("book final", public["series"]["dreamgraph"]["accuracy"][-1], flush=True)
-    print("poison rollbacks", poison["rollback_count"], flush=True)
+    print("vuln final", vuln["series"]["dreamgraph"]["accuracy"][-1], flush=True)
+    print("vuln poison rollbacks", vuln_poison["rollback_count"], flush=True)
 
 
 if __name__ == "__main__":

@@ -25,27 +25,27 @@
       "verdict": "PASS"
     },
     {
-      "dataset": "book",
-      "evidence": "results/public_summary.json",
+      "dataset": "vuln",
+      "evidence": "results/vuln_summary.json",
       "id": "H4",
-      "observed": "mean cost Revaluation 0.0410 vs textbooksNow 1.5446",
-      "statement": "On the Book seller slice, the mean final learned cost of Revaluation Books is strictly below the mean final learned cost of textbooksNow.",
+      "observed": "spearman cost vs error 0.9636",
+      "statement": "On the vulnerability slice, the Spearman correlation between mean final learned cost and feed error rate is greater than 0.2.",
       "verdict": "PASS"
     },
     {
-      "dataset": "book",
-      "evidence": "results/public_summary.json",
+      "dataset": "vuln",
+      "evidence": "results/vuln_summary.json",
       "id": "H5",
       "observed": "max abs diff 0.000000",
-      "statement": "On the Book seller slice, the dict learner matches DreamGraph on every iteration, absolute difference under 0.005.",
+      "statement": "On the vulnerability slice, the dict learner matches DreamGraph on every iteration, absolute difference under 0.005.",
       "verdict": "PASS"
     },
     {
-      "dataset": "book",
-      "evidence": "results/public_summary.json",
+      "dataset": "vuln",
+      "evidence": "results/vuln_summary.json",
       "id": "H6",
-      "observed": "final accuracy 0.9667",
-      "statement": "On the Book seller slice, DreamGraph's final held-out accuracy is at least 0.75.",
+      "observed": "dreamgraph minus majority 0.0549",
+      "statement": "On the vulnerability slice, DreamGraph's final held-out accuracy exceeds majority vote by at least 0.02.",
       "verdict": "PASS"
     },
     {
@@ -71,6 +71,30 @@
       "observed": "absolute frozen gap 0.0000",
       "statement": "A model frozen after iteration 3 finishes within 0.08 of DreamGraph on the poison run, because the poison starts at iteration 4. The guard's evidence is the receipt log, not a unique final score against that frozen model.",
       "verdict": "PASS"
+    },
+    {
+      "dataset": "vuln-poison",
+      "evidence": "results/vuln_poison.json",
+      "id": "H10",
+      "observed": "rollbacks 11, dreamgraph minus naive 0.1962",
+      "statement": "When training reviews call NVD wrong and the bad NVD mirror right, the guard rolls back at least 3 versions and the naive learner finishes at least 0.05 below DreamGraph.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "vuln-poison",
+      "evidence": "results/vuln_poison.json",
+      "id": "H11",
+      "observed": "receipts 11 well-formed True",
+      "statement": "Every vulnerability-poison rollback receipt has reason 'guard accuracy fell', a lower guard accuracy after the proposal, and strictly positive costs.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "vuln-poison",
+      "evidence": "results/vuln_poison.json",
+      "id": "H12",
+      "observed": "absolute frozen gap 0.1035",
+      "statement": "On the vulnerability poison run, a model frozen after iteration 3 finishes within 0.08 of DreamGraph, because the poison starts at iteration 4.",
+      "verdict": "FAIL"
     }
   ]
 }

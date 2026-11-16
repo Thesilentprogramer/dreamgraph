@@ -1,0 +1,43 @@
+{
+  "checksums": {
+    "alma": "20ddff43dec4cc83abbdb0e42a3189fbe9acff3900723b73229ed3f8226b4870",
+    "alpine": "dba9f4c30b8a42170ebf98d65f21c63c0a05ffcf38dd99e7e95b312df59c8700",
+    "claims_jsonl": "2e9a14374235c443776016c1036db48aaabae5f179f333a94163c3b2c73c1146",
+    "debian": "94a5a644e234fcaf673836e0f3f1135922a87782a72d53a6c604cf446b9618d3",
+    "linux": "519f67df65ff71f3303a5b4518ae1abb7de9bf464793ae579174146140d35969",
+    "mageia": "89d19616df6909f9503ae692f3a3abd8d022bb76eaaca59ac8eff2afe624acb7",
+    "opensuse": "65bed891f053f1f9826543fe27378be984a3f70996a72e36b410228d738354c8",
+    "redhat": "4448119b8fceba35f34090c3ba5120b1f77e20adfb4e7f484ca3030bd354e7b0",
+    "rocky": "ce3f52b150ac9560d923e38c25e6e71e1c5ddedd48863bd870899f4ebc45a03d",
+    "suse": "a6d190accf0e277f428cf9f51cf6eb8945fadd6eafa2a29ef34cf456b1774a1f",
+    "zenodo_dataset_zip": "62bd9f8b4873fdca29ea4ed9def18221d567ae04a0ad0ca441769cd8850a7916"
+  },
+  "cves": 314,
+  "ghsa": "The GitHub Advisory API lists these CVEs but returns no package version ranges for the sampled records, so GHSA is not a version-level voter.",
+  "gold_cves": 1128,
+  "kev": "CISA KEV has no version ranges, so it is not a voter on tag-level questions.",
+  "license": "CC BY 4.0",
+  "questions": 1817,
+  "rows": 10747,
+  "sampling": {
+    "cves_per_repo": 40,
+    "min_sources": 2,
+    "negatives_per_cve": 3,
+    "positives_per_cve": 3,
+    "seed": 0
+  },
+  "sources": [
+    "alma",
+    "alpine",
+    "debian",
+    "linux",
+    "mageia",
+    "nvd",
+    "opensuse",
+    "redhat",
+    "rocky",
+    "suse"
+  ],
+  "ubuntu": "Skipped. The Ubuntu OSV zip is 816 MB; Debian is the Debian-family feed in this slice.",
+  "zenodo": "https://doi.org/10.5281/zenodo.16440960"
+}

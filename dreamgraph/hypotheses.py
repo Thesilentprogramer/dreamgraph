@@ -36,28 +36,29 @@ STATEMENTS = (
     },
     {
         "id": "H4",
-        "dataset": "book",
-        "evidence": "results/public_summary.json",
+        "dataset": "vuln",
+        "evidence": "results/vuln_summary.json",
         "statement": (
-            "On the Book seller slice, the mean final learned cost of Revaluation Books "
-            "is strictly below the mean final learned cost of textbooksNow."
+            "On the vulnerability slice, the Spearman correlation between mean final "
+            "learned cost and feed error rate is greater than 0.2."
         ),
     },
     {
         "id": "H5",
-        "dataset": "book",
-        "evidence": "results/public_summary.json",
+        "dataset": "vuln",
+        "evidence": "results/vuln_summary.json",
         "statement": (
-            "On the Book seller slice, the dict learner matches DreamGraph on every "
+            "On the vulnerability slice, the dict learner matches DreamGraph on every "
             "iteration, absolute difference under 0.005."
         ),
     },
     {
         "id": "H6",
-        "dataset": "book",
-        "evidence": "results/public_summary.json",
+        "dataset": "vuln",
+        "evidence": "results/vuln_summary.json",
         "statement": (
-            "On the Book seller slice, DreamGraph's final held-out accuracy is at least 0.75."
+            "On the vulnerability slice, DreamGraph's final held-out accuracy exceeds "
+            "majority vote by at least 0.02."
         ),
     },
     {
@@ -88,7 +89,60 @@ STATEMENTS = (
             "is the receipt log, not a unique final score against that frozen model."
         ),
     },
+    {
+        "id": "H10",
+        "dataset": "vuln-poison",
+        "evidence": "results/vuln_poison.json",
+        "statement": (
+            "When training reviews call NVD wrong and the bad NVD mirror right, the guard "
+            "rolls back at least 3 versions and the naive learner finishes at least 0.05 below DreamGraph."
+        ),
+    },
+    {
+        "id": "H11",
+        "dataset": "vuln-poison",
+        "evidence": "results/vuln_poison.json",
+        "statement": (
+            "Every vulnerability-poison rollback receipt has reason 'guard accuracy fell', "
+            "a lower guard accuracy after the proposal, and strictly positive costs."
+        ),
+    },
+    {
+        "id": "H12",
+        "dataset": "vuln-poison",
+        "evidence": "results/vuln_poison.json",
+        "statement": (
+            "On the vulnerability poison run, a model frozen after iteration 3 finishes "
+            "within 0.08 of DreamGraph, because the poison starts at iteration 4."
+        ),
+    },
 )
+
+
+def _spearman(xs: list[float], ys: list[float]) -> float:
+    def ranks(values: list[float]) -> list[float]:
+        order = sorted(range(len(values)), key=lambda index: values[index])
+        out = [0.0] * len(values)
+        cursor = 0
+        while cursor < len(values):
+            stop = cursor
+            while stop + 1 < len(values) and values[order[stop + 1]] == values[order[cursor]]:
+                stop += 1
+            rank = (cursor + stop) / 2.0 + 1.0
+            for index in range(cursor, stop + 1):
+                out[order[index]] = rank
+            cursor = stop + 1
+        return out
+
+    rx, ry = ranks(xs), ranks(ys)
+    n = len(xs)
+    mean_x = sum(rx) / n
+    mean_y = sum(ry) / n
+    num = sum((a - mean_x) * (b - mean_y) for a, b in zip(rx, ry))
+    den_x = sum((a - mean_x) ** 2 for a in rx)
+    den_y = sum((b - mean_y) ** 2 for b in ry)
+    den = (den_x * den_y) ** 0.5
+    return num / den if den else 0.0
 
 
 def _gap(series: dict, left: str, right: str, index: int = -1) -> float:
@@ -101,23 +155,8 @@ def _max_abs(series: dict, left: str, right: str) -> float:
     return max(abs(float(x) - float(y)) for x, y in zip(a, b))
 
 
-def evaluate(published: dict, one_hop: dict, public: dict, poison: dict) -> list[dict]:
-    replay_gap = _gap(one_hop["series"], "dreamgraph", "one_hop")
-    hop_gap = float(published["series"]["dreamgraph"]["hop3_rate"][-1]) - float(
-        published["series"]["unweighted"]["hop3_rate"][-1]
-    )
-    synthetic_tie = _max_abs(published["series"], "dreamgraph", "dict_learner")
-    costs = []
-    for row in public["final_costs_by_seed"]:
-        costs.append(row["dreamgraph"])
-    rev = sum(row["Revaluation Books"] for row in costs) / len(costs)
-    text = sum(row["textbooksNow"] for row in costs) / len(costs)
-    book_tie = _max_abs(public["series"], "dreamgraph", "dict_learner")
-    book_final = float(public["series"]["dreamgraph"]["accuracy"][-1])
-    poison_gap = _gap(poison["series"], "dreamgraph", "naive")
-    rollbacks = int(poison["rollback_count"])
-    receipts = poison["receipts"]
-    receipts_ok = bool(receipts) and all(
+def _receipts_ok(receipts: list[dict]) -> bool:
+    return bool(receipts) and all(
         item["reason"] == "guard accuracy fell"
         and item["guard_after"] is not None
         and item["guard_before"] is not None
@@ -126,29 +165,57 @@ def evaluate(published: dict, one_hop: dict, public: dict, poison: dict) -> list
         and all(value > 0 for value in (item.get("proposed_costs") or {}).values())
         for item in receipts
     )
+
+
+def evaluate(published: dict, one_hop: dict, vuln: dict, poison: dict, vuln_poison: dict | None = None) -> list[dict]:
+    replay_gap = _gap(one_hop["series"], "dreamgraph", "one_hop")
+    hop_gap = float(published["series"]["dreamgraph"]["hop3_rate"][-1]) - float(
+        published["series"]["unweighted"]["hop3_rate"][-1]
+    )
+    synthetic_tie = _max_abs(published["series"], "dreamgraph", "dict_learner")
+    table = [row for row in vuln.get("source_table", []) if row.get("learned_cost") is not None and row.get("error") is not None]
+    spearman = _spearman([row["learned_cost"] for row in table], [row["error"] for row in table]) if len(table) >= 3 else 0.0
+    vuln_tie = _max_abs(vuln["series"], "dreamgraph", "dict_learner")
+    vuln_gap = _gap(vuln["series"], "dreamgraph", "majority")
+    poison_gap = _gap(poison["series"], "dreamgraph", "naive")
+    rollbacks = int(poison["rollback_count"])
+    receipts = poison["receipts"]
+    receipts_ok = _receipts_ok(receipts)
     frozen_gap = abs(_gap(poison["series"], "dreamgraph", "frozen_at_3"))
+    vuln_poison = vuln_poison or {"series": {"dreamgraph": {"accuracy": [0]}, "naive": {"accuracy": [0]}, "frozen_at_3": {"accuracy": [0]}}, "rollback_count": 0, "receipts": []}
+    v_gap = _gap(vuln_poison["series"], "dreamgraph", "naive")
+    v_roll = int(vuln_poison["rollback_count"])
+    v_receipts = vuln_poison["receipts"]
+    v_ok = _receipts_ok(v_receipts)
+    v_frozen = abs(_gap(vuln_poison["series"], "dreamgraph", "frozen_at_3"))
 
     observed = {
         "H1": f"replay gap {replay_gap:.4f}",
         "H2": f"hop3 gap {hop_gap:.4f}",
         "H3": f"max abs diff {synthetic_tie:.6f}",
-        "H4": f"mean cost Revaluation {rev:.4f} vs textbooksNow {text:.4f}",
-        "H5": f"max abs diff {book_tie:.6f}",
-        "H6": f"final accuracy {book_final:.4f}",
+        "H4": f"spearman cost vs error {spearman:.4f}",
+        "H5": f"max abs diff {vuln_tie:.6f}",
+        "H6": f"dreamgraph minus majority {vuln_gap:.4f}",
         "H7": f"rollbacks {rollbacks}, dreamgraph minus naive {poison_gap:.4f}",
         "H8": f"receipts {len(receipts)} well-formed {receipts_ok}",
         "H9": f"absolute frozen gap {frozen_gap:.4f}",
+        "H10": f"rollbacks {v_roll}, dreamgraph minus naive {v_gap:.4f}",
+        "H11": f"receipts {len(v_receipts)} well-formed {v_ok}",
+        "H12": f"absolute frozen gap {v_frozen:.4f}",
     }
     passed = {
         "H1": replay_gap >= 0.10,
         "H2": hop_gap >= 0.50,
         "H3": synthetic_tie < 0.005,
-        "H4": rev < text,
-        "H5": book_tie < 0.005,
-        "H6": book_final >= 0.75,
+        "H4": spearman > 0.2,
+        "H5": vuln_tie < 0.005,
+        "H6": vuln_gap >= 0.02,
         "H7": rollbacks >= 3 and poison_gap >= 0.10,
         "H8": receipts_ok and len(receipts) == rollbacks,
         "H9": frozen_gap <= 0.08,
+        "H10": v_roll >= 3 and v_gap >= 0.05,
+        "H11": v_ok and len(v_receipts) == v_roll,
+        "H12": v_frozen <= 0.08,
     }
     items = []
     for spec in STATEMENTS:

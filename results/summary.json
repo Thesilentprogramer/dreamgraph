@@ -22,6 +22,20 @@
       "replay_matches_published": true,
       "unweighted": 0.206667,
       "unweighted_hop3": 0.0
+    },
+    "vuln": {
+      "bm25": 0.6449,
+      "dict_learner": 0.649962,
+      "dreamgraph": 0.649962,
+      "frozen_at_3": 0.625917,
+      "ghsa_only": 0.508226,
+      "greedy": 0.646419,
+      "hand_set": 0.650215,
+      "majority": 0.595039,
+      "nvd_only": 0.649456,
+      "one_hop": 0.649962,
+      "one_shot": 0.62364,
+      "unweighted": 0.641357
     }
   },
   "backend": "hydradb",
@@ -77,7 +91,7 @@
     "seed": 0
   },
   "drift_iter": 4,
-  "evidence_generated_at": "2026-11-16T03:44:35.762271+00:00",
+  "evidence_generated_at": "2026-11-16T04:50:36.470659+00:00",
   "export_path": "results/summary.json",
   "final_costs_by_seed": [
     {
@@ -148,27 +162,27 @@
       "verdict": "PASS"
     },
     {
-      "dataset": "book",
-      "evidence": "results/public_summary.json",
+      "dataset": "vuln",
+      "evidence": "results/vuln_summary.json",
       "id": "H4",
-      "observed": "mean cost Revaluation 0.0410 vs textbooksNow 1.5446",
-      "statement": "On the Book seller slice, the mean final learned cost of Revaluation Books is strictly below the mean final learned cost of textbooksNow.",
+      "observed": "spearman cost vs error 0.9636",
+      "statement": "On the vulnerability slice, the Spearman correlation between mean final learned cost and feed error rate is greater than 0.2.",
       "verdict": "PASS"
     },
     {
-      "dataset": "book",
-      "evidence": "results/public_summary.json",
+      "dataset": "vuln",
+      "evidence": "results/vuln_summary.json",
       "id": "H5",
       "observed": "max abs diff 0.000000",
-      "statement": "On the Book seller slice, the dict learner matches DreamGraph on every iteration, absolute difference under 0.005.",
+      "statement": "On the vulnerability slice, the dict learner matches DreamGraph on every iteration, absolute difference under 0.005.",
       "verdict": "PASS"
     },
     {
-      "dataset": "book",
-      "evidence": "results/public_summary.json",
+      "dataset": "vuln",
+      "evidence": "results/vuln_summary.json",
       "id": "H6",
-      "observed": "final accuracy 0.9667",
-      "statement": "On the Book seller slice, DreamGraph's final held-out accuracy is at least 0.75.",
+      "observed": "dreamgraph minus majority 0.0549",
+      "statement": "On the vulnerability slice, DreamGraph's final held-out accuracy exceeds majority vote by at least 0.02.",
       "verdict": "PASS"
     },
     {
@@ -194,6 +208,30 @@
       "observed": "absolute frozen gap 0.0000",
       "statement": "A model frozen after iteration 3 finishes within 0.08 of DreamGraph on the poison run, because the poison starts at iteration 4. The guard's evidence is the receipt log, not a unique final score against that frozen model.",
       "verdict": "PASS"
+    },
+    {
+      "dataset": "vuln-poison",
+      "evidence": "results/vuln_poison.json",
+      "id": "H10",
+      "observed": "rollbacks 11, dreamgraph minus naive 0.1962",
+      "statement": "When training reviews call NVD wrong and the bad NVD mirror right, the guard rolls back at least 3 versions and the naive learner finishes at least 0.05 below DreamGraph.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "vuln-poison",
+      "evidence": "results/vuln_poison.json",
+      "id": "H11",
+      "observed": "receipts 11 well-formed True",
+      "statement": "Every vulnerability-poison rollback receipt has reason 'guard accuracy fell', a lower guard accuracy after the proposal, and strictly positive costs.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "vuln-poison",
+      "evidence": "results/vuln_poison.json",
+      "id": "H12",
+      "observed": "absolute frozen gap 0.1035",
+      "statement": "On the vulnerability poison run, a model frozen after iteration 3 finishes within 0.08 of DreamGraph, because the poison starts at iteration 4.",
+      "verdict": "FAIL"
     }
   ],
   "load": {
@@ -1812,1072 +1850,6 @@
   ],
   "precomputed": true,
   "project": "dreamgraph",
-  "public": {
-    "citation": "Yin, Han, and Yu, TKDE 2008, claims; Dong, Berti-Equille, and Srivastava, VLDB 2009, gold author lists from book covers. Cached slice: data/book/claims.jsonl.",
-    "config": {
-      "batch": 40,
-      "bootstrap": 1000,
-      "guard": 20,
-      "hand_set": {
-        "Revaluation Books": 1.0,
-        "The Book Depository": 2.0,
-        "textbooksNow": 6.0
-      },
-      "hand_set_rule": "fixed volume prior, not gold accuracy",
-      "held_out": 30,
-      "iterations": 8,
-      "protocol": "score then update; no label drift; same window and guard as the synthetic loop",
-      "seeds": [
-        0,
-        1,
-        2
-      ],
-      "train_books": 25,
-      "window": 100
-    },
-    "dataset": "book",
-    "demo": {
-      "agree": [
-        5025,
-        5026,
-        5027,
-        5028,
-        5029,
-        5030,
-        5031,
-        5032
-      ],
-      "costs": {
-        "Revaluation Books": 0.031847,
-        "The Book Depository": 0.731343,
-        "textbooksNow": 1.137931
-      },
-      "disagree": [],
-      "questions": [
-        5025,
-        5026,
-        5027,
-        5028,
-        5029,
-        5030,
-        5031,
-        5032
-      ],
-      "seed": 0
-    },
-    "encoding": "Each seller is a 2-edge chain book \u2192 listing \u2192 author. Both edges carry that seller's learned cost. Path length does not depend on correctness. Unweighted search tie-breaks on node ids, and listing ids follow alphabetical seller order, so Revaluation Books wins ties when it listed the book.",
-    "final_costs_by_seed": [
-      {
-        "dreamgraph": {
-          "Revaluation Books": 0.018868,
-          "The Book Depository": 0.652174,
-          "textbooksNow": 1.129032
-        },
-        "seed": 0
-      },
-      {
-        "dreamgraph": {
-          "Revaluation Books": 0.045161,
-          "The Book Depository": 1.195122,
-          "textbooksNow": 2.904762
-        },
-        "seed": 1
-      },
-      {
-        "dreamgraph": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 0.670886,
-          "textbooksNow": 0.6
-        },
-        "seed": 2
-      }
-    ],
-    "license_note": "Research distribution at https://lunadong.com/fusionDataSets.htm. See data/book/PROVENANCE.md.",
-    "match_rule": "token Jaccard >= 0.5 on tokens longer than 2 characters, excluding 'and' and 'the'",
-    "methods": [
-      "dreamgraph",
-      "unweighted",
-      "hand_set",
-      "one_shot",
-      "dict_learner",
-      "greedy",
-      "bm25",
-      "frozen_at_3",
-      "one_hop"
-    ],
-    "notes": [
-      "1-hop lookup uses DreamGraph's learned costs and only the first edge. On this encoding both edges of a chain share a seller, so the sum ranks sellers the same way.",
-      "The dict learner minimizes that same sum outside HydraDB.",
-      "Seller accuracies on the full slice are descriptive. They are not written onto edges."
-    ],
-    "policies": [
-      {
-        "costs": {
-          "Revaluation Books": 0.076923,
-          "The Book Depository": 0.789474,
-          "textbooksNow": 0.714286
-        },
-        "guard_accuracy": 0.9,
-        "guard_after": 0.9,
-        "guard_before": 0.9,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 1,
-        "proposed_costs": {
-          "Revaluation Books": 0.076923,
-          "The Book Depository": 0.789474,
-          "textbooksNow": 0.714286
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 1,
-        "window": 40
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.06087,
-          "The Book Depository": 0.622642,
-          "textbooksNow": 1.086957
-        },
-        "guard_accuracy": 0.9,
-        "guard_after": 0.9,
-        "guard_before": 0.9,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 2,
-        "proposed_costs": {
-          "Revaluation Books": 0.06087,
-          "The Book Depository": 0.622642,
-          "textbooksNow": 1.086957
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 2,
-        "window": 80
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.072848,
-          "The Book Depository": 0.710145,
-          "textbooksNow": 1.344828
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 3,
-        "proposed_costs": {
-          "Revaluation Books": 0.072848,
-          "The Book Depository": 0.710145,
-          "textbooksNow": 1.344828
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 3,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 0.815385,
-          "textbooksNow": 0.828571
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 4,
-        "proposed_costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 0.815385,
-          "textbooksNow": 0.828571
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 4,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.031847,
-          "The Book Depository": 0.704918,
-          "textbooksNow": 0.581395
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 5,
-        "proposed_costs": {
-          "Revaluation Books": 0.031847,
-          "The Book Depository": 0.704918,
-          "textbooksNow": 0.581395
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 5,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.045161,
-          "The Book Depository": 0.723077,
-          "textbooksNow": 0.828571
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 6,
-        "proposed_costs": {
-          "Revaluation Books": 0.045161,
-          "The Book Depository": 0.723077,
-          "textbooksNow": 0.828571
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 6,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.031847,
-          "The Book Depository": 0.731343,
-          "textbooksNow": 1.137931
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 7,
-        "proposed_costs": {
-          "Revaluation Books": 0.031847,
-          "The Book Depository": 0.731343,
-          "textbooksNow": 1.137931
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 7,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.018868,
-          "The Book Depository": 0.652174,
-          "textbooksNow": 1.129032
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 8,
-        "proposed_costs": {
-          "Revaluation Books": 0.018868,
-          "The Book Depository": 0.652174,
-          "textbooksNow": 1.129032
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 0,
-        "version": 8,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.076923,
-          "The Book Depository": 1.181818,
-          "textbooksNow": 5.666667
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 1,
-        "proposed_costs": {
-          "Revaluation Books": 0.076923,
-          "The Book Depository": 1.181818,
-          "textbooksNow": 5.666667
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 9,
-        "window": 40
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.042735,
-          "The Book Depository": 1.322581,
-          "textbooksNow": 2.866667
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 2,
-        "proposed_costs": {
-          "Revaluation Books": 0.042735,
-          "The Book Depository": 1.322581,
-          "textbooksNow": 2.866667
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 10,
-        "window": 80
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.018868,
-          "The Book Depository": 1.25641,
-          "textbooksNow": 2.826087
-        },
-        "guard_accuracy": 0.9,
-        "guard_after": 0.9,
-        "guard_before": 0.9,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 3,
-        "proposed_costs": {
-          "Revaluation Books": 0.018868,
-          "The Book Depository": 1.25641,
-          "textbooksNow": 2.826087
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 11,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 1.228571,
-          "textbooksNow": 1.909091
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 4,
-        "proposed_costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 1.228571,
-          "textbooksNow": 1.909091
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 12,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.072848,
-          "The Book Depository": 1.228571,
-          "textbooksNow": 1.967742
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 5,
-        "proposed_costs": {
-          "Revaluation Books": 0.072848,
-          "The Book Depository": 1.228571,
-          "textbooksNow": 1.967742
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 13,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.045161,
-          "The Book Depository": 1.153846,
-          "textbooksNow": 2.652174
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 6,
-        "proposed_costs": {
-          "Revaluation Books": 0.045161,
-          "The Book Depository": 1.153846,
-          "textbooksNow": 2.652174
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 14,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 1.195122,
-          "textbooksNow": 2.565217
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 7,
-        "proposed_costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 1.195122,
-          "textbooksNow": 2.565217
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 15,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.045161,
-          "The Book Depository": 1.195122,
-          "textbooksNow": 2.904762
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 8,
-        "proposed_costs": {
-          "Revaluation Books": 0.045161,
-          "The Book Depository": 1.195122,
-          "textbooksNow": 2.904762
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 1,
-        "version": 16,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.272727,
-          "The Book Depository": 0.481481,
-          "textbooksNow": 3.666667
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 1,
-        "proposed_costs": {
-          "Revaluation Books": 0.272727,
-          "The Book Depository": 0.481481,
-          "textbooksNow": 3.666667
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 17,
-        "window": 40
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.161905,
-          "The Book Depository": 0.661017,
-          "textbooksNow": 3.181818
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 2,
-        "proposed_costs": {
-          "Revaluation Books": 0.161905,
-          "The Book Depository": 0.661017,
-          "textbooksNow": 3.181818
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 18,
-        "window": 80
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.102041,
-          "The Book Depository": 0.636364,
-          "textbooksNow": 2.866667
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 3,
-        "proposed_costs": {
-          "Revaluation Books": 0.102041,
-          "The Book Depository": 0.636364,
-          "textbooksNow": 2.866667
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 19,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.117241,
-          "The Book Depository": 0.52809,
-          "textbooksNow": 1.526316
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 4,
-        "proposed_costs": {
-          "Revaluation Books": 0.117241,
-          "The Book Depository": 0.52809,
-          "textbooksNow": 1.526316
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 20,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.072848,
-          "The Book Depository": 0.74026,
-          "textbooksNow": 1.0
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 5,
-        "proposed_costs": {
-          "Revaluation Books": 0.072848,
-          "The Book Depository": 0.74026,
-          "textbooksNow": 1.0
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 21,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.006211,
-          "The Book Depository": 0.714286,
-          "textbooksNow": 1.137931
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 6,
-        "proposed_costs": {
-          "Revaluation Books": 0.006211,
-          "The Book Depository": 0.714286,
-          "textbooksNow": 1.137931
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 22,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.018868,
-          "The Book Depository": 0.679012,
-          "textbooksNow": 1.0
-        },
-        "guard_accuracy": 1.0,
-        "guard_after": 1.0,
-        "guard_before": 1.0,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 7,
-        "proposed_costs": {
-          "Revaluation Books": 0.018868,
-          "The Book Depository": 0.679012,
-          "textbooksNow": 1.0
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 23,
-        "window": 100
-      },
-      {
-        "costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 0.670886,
-          "textbooksNow": 0.6
-        },
-        "guard_accuracy": 0.95,
-        "guard_after": 0.95,
-        "guard_before": 0.95,
-        "heldout_after": 0.966667,
-        "heldout_before": 0.966667,
-        "iteration": 8,
-        "proposed_costs": {
-          "Revaluation Books": 0.058824,
-          "The Book Depository": 0.670886,
-          "textbooksNow": 0.6
-        },
-        "reason": "accepted",
-        "rolled_back": false,
-        "seed": 2,
-        "version": 24,
-        "window": 100
-      }
-    ],
-    "rollback_counts": {
-      "0": 0,
-      "1": 0,
-      "2": 0
-    },
-    "seller_heldout_mean": {
-      "Revaluation Books": 0.966667,
-      "The Book Depository": 0.689044,
-      "textbooksNow": 0.39899
-    },
-    "series": {
-      "bm25": {
-        "accuracy": [
-          0.788889,
-          0.788889,
-          0.788889,
-          0.788889,
-          0.788889,
-          0.788889,
-          0.788889,
-          0.788889
-        ],
-        "ci_high": [
-          0.866667,
-          0.866667,
-          0.866667,
-          0.877778,
-          0.866667,
-          0.866667,
-          0.866667,
-          0.866667
-        ],
-        "ci_low": [
-          0.7,
-          0.7,
-          0.711111,
-          0.7,
-          0.711111,
-          0.7,
-          0.711111,
-          0.711111
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "dict_learner": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.922222,
-          0.922222,
-          0.933333,
-          0.933333,
-          0.922222,
-          0.933333,
-          0.922222
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "dreamgraph": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "frozen_at_3": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.933333
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "greedy": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.922222,
-          0.922222,
-          0.933333,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "hand_set": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.933333,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "one_hop": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "one_shot": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "unweighted": {
-        "accuracy": [
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667,
-          0.966667
-        ],
-        "ci_high": [
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "ci_low": [
-          0.922222,
-          0.922222,
-          0.933333,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222,
-          0.922222
-        ],
-        "hop3_rate": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]
-      }
-    },
-    "slice_books": 55,
-    "source_accuracy_on_slice": {
-      "Revaluation Books": {
-        "accuracy": 0.963636,
-        "hits": 53,
-        "n": 55
-      },
-      "The Book Depository": {
-        "accuracy": 0.625,
-        "hits": 25,
-        "n": 40
-      },
-      "textbooksNow": {
-        "accuracy": 0.380952,
-        "hits": 8,
-        "n": 21
-      }
-    },
-    "sources": [
-      "Revaluation Books",
-      "The Book Depository",
-      "textbooksNow"
-    ]
-  },
   "rollback_counts": {
     "0": 0,
     "1": 0,
@@ -3265,5 +2237,3558 @@
   },
   "storage": "moto",
   "synthetic_noise": true,
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "vuln": {
+    "citation": "Zenodo 16440960, CC BY 4.0, manual affected tags. Feeds: NVD CPE ranges via the CVE-to-OSV conversion, and OSV ecosystem dumps for Debian, Alpine, Red Hat, Linux, AlmaLinux, openSUSE, SUSE, Mageia, and Rocky Linux.",
+    "config": {
+      "batch": 40,
+      "bootstrap": 1000,
+      "guard": 20,
+      "held_out": 1317,
+      "iterations": 8,
+      "protocol": "score then update; chronological batches by feed modified time",
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "train_questions": 500,
+      "window": 100
+    },
+    "dataset": "vuln",
+    "demo": {
+      "costs": {
+        "alma": 1.424242,
+        "alpine": 0.886792,
+        "debian": 0.903614,
+        "linux": 0.076923,
+        "mageia": 1.4,
+        "nvd": 0.244094,
+        "nvd_mirror": 4.096774,
+        "opensuse": 1.077922,
+        "redhat": 1.266667,
+        "rocky": 1.0,
+        "suse": 1.144928
+      },
+      "disagree": [
+        8500,
+        8501,
+        8504,
+        8510,
+        8511,
+        8512,
+        8513,
+        8514
+      ],
+      "labels": {
+        "8500": "linux v2.6.16 \u00b7 CVE-2022-3628",
+        "8501": "FFmpeg n3.0.7 \u00b7 CVE-2021-38090",
+        "8504": "FFmpeg n0.8.4 \u00b7 CVE-2020-20902",
+        "8510": "openssl OpenSSL_1_1_1t \u00b7 CVE-2022-4304",
+        "8511": "wireshark wireshark-1.8.3 \u00b7 CVE-2020-9429",
+        "8512": "ImageMagick 7.0.11-1 \u00b7 CVE-2023-3745",
+        "8513": "wireshark v3.4.10 \u00b7 CVE-2021-39925",
+        "8514": "httpd 2.2.20 \u00b7 CVE-2020-11993"
+      },
+      "questions": [
+        8500,
+        8501,
+        8504,
+        8510,
+        8511,
+        8512,
+        8513,
+        8514
+      ],
+      "seed": 0
+    },
+    "drift": {
+      "kind": "real",
+      "note": "Questions are ordered by the newest feed modified time. A shift of at least 0.05 with 40 judgments on each side is treated as real drift.",
+      "shifts": {
+        "alma": -0.034274,
+        "alpine": -0.010746,
+        "debian": -0.029796,
+        "mageia": -0.091016,
+        "nvd": 0.102252,
+        "opensuse": -0.072209,
+        "redhat": -0.014994,
+        "rocky": -0.078028,
+        "suse": -0.100342
+      }
+    },
+    "drift_iter": 4,
+    "final_costs_by_seed": [
+      {
+        "dreamgraph": {
+          "alma": 1.702703,
+          "alpine": 0.714286,
+          "debian": 1.106667,
+          "linux": 0.037037,
+          "mageia": 1.410256,
+          "nvd": 0.289256,
+          "nvd_mirror": 3.457143,
+          "opensuse": 1.253968,
+          "redhat": 1.444444,
+          "rocky": 1.666667,
+          "suse": 1.350877
+        },
+        "seed": 0
+      },
+      {
+        "dreamgraph": {
+          "alma": 1.742857,
+          "alpine": 0.350649,
+          "debian": 0.78022,
+          "linux": 0.028571,
+          "mageia": 1.122449,
+          "nvd": 0.333333,
+          "nvd_mirror": 3.0,
+          "opensuse": 0.84,
+          "redhat": 1.177778,
+          "rocky": 2.904762,
+          "suse": 0.835616
+        },
+        "seed": 1
+      },
+      {
+        "dreamgraph": {
+          "alma": 1.232558,
+          "alpine": 0.428571,
+          "debian": 1.0,
+          "linux": 0.052632,
+          "mageia": 1.163265,
+          "nvd": 0.415929,
+          "nvd_mirror": 2.404255,
+          "opensuse": 1.415094,
+          "redhat": 1.177778,
+          "rocky": 1.606061,
+          "suse": 1.145455
+        },
+        "seed": 2
+      }
+    ],
+    "hand_set": {
+      "alma": 9.0,
+      "alpine": 6.0,
+      "debian": 3.0,
+      "linux": 11.0,
+      "mageia": 7.0,
+      "nvd": 1.0,
+      "nvd_mirror": 2.0,
+      "opensuse": 4.0,
+      "redhat": 8.0,
+      "rocky": 10.0,
+      "suse": 5.0
+    },
+    "methods": [
+      "dreamgraph",
+      "unweighted",
+      "hand_set",
+      "one_shot",
+      "dict_learner",
+      "greedy",
+      "bm25",
+      "frozen_at_3",
+      "one_hop",
+      "majority",
+      "nvd_only",
+      "ghsa_only"
+    ],
+    "notes": [
+      "nvd_mirror is a modeled aggregator that flips NVD's verdict. It is not a downloaded feed.",
+      "GHSA is scored as an abstaining baseline: the Advisory API had no version ranges for this gold set.",
+      "Question order inside an iteration follows feed modified timestamps.",
+      "Questions are ordered by the newest feed modified time. A shift of at least 0.05 with 40 judgments on each side is treated as real drift."
+    ],
+    "poison": false,
+    "policies": [
+      {
+        "costs": {
+          "alma": 0.333333,
+          "alpine": 0.777778,
+          "debian": 0.733333,
+          "linux": 1.0,
+          "mageia": 0.578947,
+          "nvd": 0.391304,
+          "nvd_mirror": 2.555556,
+          "opensuse": 0.826087,
+          "redhat": 0.428571,
+          "rocky": 3.0,
+          "suse": 0.555556
+        },
+        "guard_accuracy": 0.55,
+        "guard_after": 0.55,
+        "guard_before": 0.55,
+        "heldout_after": 0.57555,
+        "heldout_before": 0.64161,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 0.333333,
+          "alpine": 0.777778,
+          "debian": 0.733333,
+          "linux": 1.0,
+          "mageia": 0.578947,
+          "nvd": 0.391304,
+          "nvd_mirror": 2.555556,
+          "opensuse": 0.826087,
+          "redhat": 0.428571,
+          "rocky": 3.0,
+          "suse": 0.555556
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 1,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 1.526316,
+          "alpine": 0.672727,
+          "debian": 1.042553,
+          "linux": 1.0,
+          "mageia": 0.818182,
+          "nvd": 0.534247,
+          "nvd_mirror": 1.871795,
+          "opensuse": 0.936508,
+          "redhat": 1.0,
+          "rocky": 1.434783,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.35,
+        "guard_after": 0.35,
+        "guard_before": 0.35,
+        "heldout_after": 0.64085,
+        "heldout_before": 0.57555,
+        "iteration": 2,
+        "proposed_costs": {
+          "alma": 1.526316,
+          "alpine": 0.672727,
+          "debian": 1.042553,
+          "linux": 1.0,
+          "mageia": 0.818182,
+          "nvd": 0.534247,
+          "nvd_mirror": 1.871795,
+          "opensuse": 0.936508,
+          "redhat": 1.0,
+          "rocky": 1.434783,
+          "suse": 1.0
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 2,
+        "window": 80
+      },
+      {
+        "costs": {
+          "alma": 1.705882,
+          "alpine": 0.640449,
+          "debian": 0.924051,
+          "linux": 1.0,
+          "mageia": 0.546667,
+          "nvd": 0.741935,
+          "nvd_mirror": 1.347826,
+          "opensuse": 0.862069,
+          "redhat": 1.137931,
+          "rocky": 1.347826,
+          "suse": 1.140845
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.8,
+        "guard_before": 0.75,
+        "heldout_after": 0.593774,
+        "heldout_before": 0.64085,
+        "iteration": 3,
+        "proposed_costs": {
+          "alma": 1.705882,
+          "alpine": 0.640449,
+          "debian": 0.924051,
+          "linux": 1.0,
+          "mageia": 0.546667,
+          "nvd": 0.741935,
+          "nvd_mirror": 1.347826,
+          "opensuse": 0.862069,
+          "redhat": 1.137931,
+          "rocky": 1.347826,
+          "suse": 1.140845
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 3,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.882353,
+          "alpine": 0.458824,
+          "debian": 0.60396,
+          "linux": 1.0,
+          "mageia": 0.358491,
+          "nvd": 0.60396,
+          "nvd_mirror": 1.655738,
+          "opensuse": 0.542857,
+          "redhat": 0.894737,
+          "rocky": 1.363636,
+          "suse": 0.811765
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.75,
+        "guard_before": 0.7,
+        "heldout_after": 0.581625,
+        "heldout_before": 0.593774,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 0.882353,
+          "alpine": 0.458824,
+          "debian": 0.60396,
+          "linux": 1.0,
+          "mageia": 0.358491,
+          "nvd": 0.60396,
+          "nvd_mirror": 1.655738,
+          "opensuse": 0.542857,
+          "redhat": 0.894737,
+          "rocky": 1.363636,
+          "suse": 0.811765
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 4,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.826087,
+          "alpine": 0.228916,
+          "debian": 0.572816,
+          "linux": 1.0,
+          "mageia": 0.777778,
+          "nvd": 0.486239,
+          "nvd_mirror": 2.056604,
+          "opensuse": 0.485714,
+          "redhat": 0.84,
+          "rocky": 1.117647,
+          "suse": 0.578947
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.6,
+        "guard_before": 0.6,
+        "heldout_after": 0.64085,
+        "heldout_before": 0.581625,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 0.826087,
+          "alpine": 0.228916,
+          "debian": 0.572816,
+          "linux": 1.0,
+          "mageia": 0.777778,
+          "nvd": 0.486239,
+          "nvd_mirror": 2.056604,
+          "opensuse": 0.485714,
+          "redhat": 0.84,
+          "rocky": 1.117647,
+          "suse": 0.578947
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 5,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 0.415385,
+          "debian": 0.670103,
+          "linux": 1.0,
+          "mageia": 1.148148,
+          "nvd": 0.384615,
+          "nvd_mirror": 2.6,
+          "opensuse": 0.730337,
+          "redhat": 0.851852,
+          "rocky": 0.789474,
+          "suse": 0.662921
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.85,
+        "guard_before": 0.3,
+        "heldout_after": 0.64085,
+        "heldout_before": 0.64085,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 1.0,
+          "alpine": 0.415385,
+          "debian": 0.670103,
+          "linux": 1.0,
+          "mageia": 1.148148,
+          "nvd": 0.384615,
+          "nvd_mirror": 2.6,
+          "opensuse": 0.730337,
+          "redhat": 0.851852,
+          "rocky": 0.789474,
+          "suse": 0.662921
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 6,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.424242,
+          "alpine": 0.886792,
+          "debian": 0.903614,
+          "linux": 0.076923,
+          "mageia": 1.4,
+          "nvd": 0.244094,
+          "nvd_mirror": 4.096774,
+          "opensuse": 1.077922,
+          "redhat": 1.266667,
+          "rocky": 1.0,
+          "suse": 1.144928
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.7,
+        "guard_before": 0.7,
+        "heldout_after": 0.645406,
+        "heldout_before": 0.64085,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 1.424242,
+          "alpine": 0.886792,
+          "debian": 0.903614,
+          "linux": 0.076923,
+          "mageia": 1.4,
+          "nvd": 0.244094,
+          "nvd_mirror": 4.096774,
+          "opensuse": 1.077922,
+          "redhat": 1.266667,
+          "rocky": 1.0,
+          "suse": 1.144928
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 7,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.702703,
+          "alpine": 0.714286,
+          "debian": 1.106667,
+          "linux": 0.037037,
+          "mageia": 1.410256,
+          "nvd": 0.289256,
+          "nvd_mirror": 3.457143,
+          "opensuse": 1.253968,
+          "redhat": 1.444444,
+          "rocky": 1.666667,
+          "suse": 1.350877
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.645406,
+        "heldout_before": 0.645406,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 1.702703,
+          "alpine": 0.714286,
+          "debian": 1.106667,
+          "linux": 0.037037,
+          "mageia": 1.410256,
+          "nvd": 0.289256,
+          "nvd_mirror": 3.457143,
+          "opensuse": 1.253968,
+          "redhat": 1.444444,
+          "rocky": 1.666667,
+          "suse": 1.350877
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 8,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 1.0,
+          "debian": 1.0,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.5,
+        "guard_before": 0.6,
+        "heldout_after": 0.585421,
+        "heldout_before": 0.639332,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 0.2,
+          "alpine": 0.333333,
+          "debian": 0.428571,
+          "linux": 1.0,
+          "mageia": 0.684211,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 0.555556,
+          "redhat": 0.333333,
+          "rocky": 1.0,
+          "suse": 0.555556
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 9,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 1.0,
+          "debian": 1.0,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.6,
+        "guard_before": 0.65,
+        "heldout_after": 0.538345,
+        "heldout_before": 0.639332,
+        "iteration": 2,
+        "proposed_costs": {
+          "alma": 0.368421,
+          "alpine": 0.660377,
+          "debian": 0.587302,
+          "linux": 1.0,
+          "mageia": 0.735849,
+          "nvd": 0.859649,
+          "nvd_mirror": 1.163265,
+          "opensuse": 0.626667,
+          "redhat": 0.62963,
+          "rocky": 0.652174,
+          "suse": 0.836066
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 10,
+        "window": 80
+      },
+      {
+        "costs": {
+          "alma": 0.904762,
+          "alpine": 0.614458,
+          "debian": 0.67033,
+          "linux": 1.0,
+          "mageia": 0.672131,
+          "nvd": 0.78022,
+          "nvd_mirror": 1.28169,
+          "opensuse": 0.862069,
+          "redhat": 1.296296,
+          "rocky": 0.935484,
+          "suse": 0.974026
+        },
+        "guard_accuracy": 0.5,
+        "guard_after": 0.5,
+        "guard_before": 0.5,
+        "heldout_after": 0.639332,
+        "heldout_before": 0.639332,
+        "iteration": 3,
+        "proposed_costs": {
+          "alma": 0.904762,
+          "alpine": 0.614458,
+          "debian": 0.67033,
+          "linux": 1.0,
+          "mageia": 0.672131,
+          "nvd": 0.78022,
+          "nvd_mirror": 1.28169,
+          "opensuse": 0.862069,
+          "redhat": 1.296296,
+          "rocky": 0.935484,
+          "suse": 0.974026
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 11,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.086957,
+          "alpine": 0.421687,
+          "debian": 0.670103,
+          "linux": 1.0,
+          "mageia": 0.62963,
+          "nvd": 0.636364,
+          "nvd_mirror": 1.571429,
+          "opensuse": 0.811765,
+          "redhat": 1.521739,
+          "rocky": 1.347826,
+          "suse": 0.759036
+        },
+        "guard_accuracy": 0.5,
+        "guard_after": 0.5,
+        "guard_before": 0.5,
+        "heldout_after": 0.649203,
+        "heldout_before": 0.639332,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 1.086957,
+          "alpine": 0.421687,
+          "debian": 0.670103,
+          "linux": 1.0,
+          "mageia": 0.62963,
+          "nvd": 0.636364,
+          "nvd_mirror": 1.571429,
+          "opensuse": 0.811765,
+          "redhat": 1.521739,
+          "rocky": 1.347826,
+          "suse": 0.759036
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 12,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 0.555556,
+          "debian": 0.60396,
+          "linux": 1.0,
+          "mageia": 1.181818,
+          "nvd": 0.636364,
+          "nvd_mirror": 1.571429,
+          "opensuse": 0.655172,
+          "redhat": 0.904762,
+          "rocky": 1.615385,
+          "suse": 0.638554
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.6,
+        "guard_before": 0.45,
+        "heldout_after": 0.639332,
+        "heldout_before": 0.649203,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 1.0,
+          "alpine": 0.555556,
+          "debian": 0.60396,
+          "linux": 1.0,
+          "mageia": 1.181818,
+          "nvd": 0.636364,
+          "nvd_mirror": 1.571429,
+          "opensuse": 0.655172,
+          "redhat": 0.904762,
+          "rocky": 1.615385,
+          "suse": 0.638554
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 13,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 0.555556,
+          "debian": 0.60396,
+          "linux": 1.0,
+          "mageia": 1.181818,
+          "nvd": 0.636364,
+          "nvd_mirror": 1.571429,
+          "opensuse": 0.655172,
+          "redhat": 0.904762,
+          "rocky": 1.615385,
+          "suse": 0.638554
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.65,
+        "guard_before": 0.7,
+        "heldout_after": 0.596052,
+        "heldout_before": 0.639332,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 1.533333,
+          "alpine": 1.162162,
+          "debian": 0.636364,
+          "linux": 0.111111,
+          "mageia": 1.16,
+          "nvd": 0.684211,
+          "nvd_mirror": 1.461538,
+          "opensuse": 0.822785,
+          "redhat": 0.92,
+          "rocky": 1.857143,
+          "suse": 0.777778
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 14,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.666667,
+          "alpine": 0.735849,
+          "debian": 0.670103,
+          "linux": 0.037037,
+          "mageia": 1.108108,
+          "nvd": 0.52381,
+          "nvd_mirror": 1.909091,
+          "opensuse": 0.792208,
+          "redhat": 1.228571,
+          "rocky": 2.066667,
+          "suse": 0.813333
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.7,
+        "guard_before": 0.65,
+        "heldout_after": 0.649203,
+        "heldout_before": 0.639332,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 1.666667,
+          "alpine": 0.735849,
+          "debian": 0.670103,
+          "linux": 0.037037,
+          "mageia": 1.108108,
+          "nvd": 0.52381,
+          "nvd_mirror": 1.909091,
+          "opensuse": 0.792208,
+          "redhat": 1.228571,
+          "rocky": 2.066667,
+          "suse": 0.813333
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 15,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.742857,
+          "alpine": 0.350649,
+          "debian": 0.78022,
+          "linux": 0.028571,
+          "mageia": 1.122449,
+          "nvd": 0.333333,
+          "nvd_mirror": 3.0,
+          "opensuse": 0.84,
+          "redhat": 1.177778,
+          "rocky": 2.904762,
+          "suse": 0.835616
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.75,
+        "guard_before": 0.75,
+        "heldout_after": 0.648443,
+        "heldout_before": 0.649203,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 1.742857,
+          "alpine": 0.350649,
+          "debian": 0.78022,
+          "linux": 0.028571,
+          "mageia": 1.122449,
+          "nvd": 0.333333,
+          "nvd_mirror": 3.0,
+          "opensuse": 0.84,
+          "redhat": 1.177778,
+          "rocky": 2.904762,
+          "suse": 0.835616
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 16,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 0.777778,
+          "debian": 0.578947,
+          "linux": 1.0,
+          "mageia": 0.764706,
+          "nvd": 0.538462,
+          "nvd_mirror": 1.857143,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 0.826087
+        },
+        "guard_accuracy": 0.45,
+        "guard_after": 0.45,
+        "guard_before": 0.45,
+        "heldout_after": 0.656036,
+        "heldout_before": 0.643128,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 1.0,
+          "alpine": 0.777778,
+          "debian": 0.578947,
+          "linux": 1.0,
+          "mageia": 0.764706,
+          "nvd": 0.538462,
+          "nvd_mirror": 1.857143,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 0.826087
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 17,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 1.666667,
+          "alpine": 0.787234,
+          "debian": 0.773585,
+          "linux": 1.0,
+          "mageia": 0.764706,
+          "nvd": 1.040816,
+          "nvd_mirror": 0.960784,
+          "opensuse": 0.820896,
+          "redhat": 0.935484,
+          "rocky": 0.84,
+          "suse": 0.859649
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.65,
+        "guard_before": 0.5,
+        "heldout_after": 0.577069,
+        "heldout_before": 0.656036,
+        "iteration": 2,
+        "proposed_costs": {
+          "alma": 1.666667,
+          "alpine": 0.787234,
+          "debian": 0.773585,
+          "linux": 1.0,
+          "mageia": 0.764706,
+          "nvd": 1.040816,
+          "nvd_mirror": 0.960784,
+          "opensuse": 0.820896,
+          "redhat": 0.935484,
+          "rocky": 0.84,
+          "suse": 0.859649
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 18,
+        "window": 80
+      },
+      {
+        "costs": {
+          "alma": 1.705882,
+          "alpine": 0.516484,
+          "debian": 0.536842,
+          "linux": 1.0,
+          "mageia": 0.652174,
+          "nvd": 0.905882,
+          "nvd_mirror": 1.103896,
+          "opensuse": 0.705263,
+          "redhat": 1.0,
+          "rocky": 0.925926,
+          "suse": 0.87013
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.8,
+        "guard_before": 0.65,
+        "heldout_after": 0.644647,
+        "heldout_before": 0.577069,
+        "iteration": 3,
+        "proposed_costs": {
+          "alma": 1.705882,
+          "alpine": 0.516484,
+          "debian": 0.536842,
+          "linux": 1.0,
+          "mageia": 0.652174,
+          "nvd": 0.905882,
+          "nvd_mirror": 1.103896,
+          "opensuse": 0.705263,
+          "redhat": 1.0,
+          "rocky": 0.925926,
+          "suse": 0.87013
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 19,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.73913,
+          "alpine": 0.319588,
+          "debian": 0.338843,
+          "linux": 1.0,
+          "mageia": 0.555556,
+          "nvd": 0.572816,
+          "nvd_mirror": 1.745763,
+          "opensuse": 0.542857,
+          "redhat": 0.703704,
+          "rocky": 1.235294,
+          "suse": 0.642105
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.65,
+        "guard_before": 0.65,
+        "heldout_after": 0.644647,
+        "heldout_before": 0.644647,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 0.73913,
+          "alpine": 0.319588,
+          "debian": 0.338843,
+          "linux": 1.0,
+          "mageia": 0.555556,
+          "nvd": 0.572816,
+          "nvd_mirror": 1.745763,
+          "opensuse": 0.542857,
+          "redhat": 0.703704,
+          "rocky": 1.235294,
+          "suse": 0.642105
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 20,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.73913,
+          "alpine": 0.319588,
+          "debian": 0.338843,
+          "linux": 1.0,
+          "mageia": 0.555556,
+          "nvd": 0.572816,
+          "nvd_mirror": 1.745763,
+          "opensuse": 0.542857,
+          "redhat": 0.703704,
+          "rocky": 1.235294,
+          "suse": 0.642105
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.6,
+        "guard_before": 0.65,
+        "heldout_after": 0.654518,
+        "heldout_before": 0.644647,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 0.485714,
+          "alpine": 0.283951,
+          "debian": 0.584158,
+          "linux": 1.0,
+          "mageia": 0.538462,
+          "nvd": 0.459459,
+          "nvd_mirror": 2.176471,
+          "opensuse": 0.495327,
+          "redhat": 0.567568,
+          "rocky": 0.84,
+          "suse": 0.485714
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 21,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.684211,
+          "alpine": 0.428571,
+          "debian": 0.758242,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 0.60396,
+          "nvd_mirror": 1.655738,
+          "opensuse": 0.807229,
+          "redhat": 1.352941,
+          "rocky": 1.363636,
+          "suse": 0.783133
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.65,
+        "guard_before": 0.55,
+        "heldout_after": 0.657555,
+        "heldout_before": 0.644647,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 0.684211,
+          "alpine": 0.428571,
+          "debian": 0.758242,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 0.60396,
+          "nvd_mirror": 1.655738,
+          "opensuse": 0.807229,
+          "redhat": 1.352941,
+          "rocky": 1.363636,
+          "suse": 0.783133
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 22,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.387097,
+          "alpine": 0.719298,
+          "debian": 0.903614,
+          "linux": 0.111111,
+          "mageia": 1.27027,
+          "nvd": 0.584158,
+          "nvd_mirror": 1.711864,
+          "opensuse": 1.380952,
+          "redhat": 1.709677,
+          "rocky": 2.578947,
+          "suse": 1.295082
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.75,
+        "guard_before": 0.75,
+        "heldout_after": 0.655277,
+        "heldout_before": 0.657555,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 1.387097,
+          "alpine": 0.719298,
+          "debian": 0.903614,
+          "linux": 0.111111,
+          "mageia": 1.27027,
+          "nvd": 0.584158,
+          "nvd_mirror": 1.711864,
+          "opensuse": 1.380952,
+          "redhat": 1.709677,
+          "rocky": 2.578947,
+          "suse": 1.295082
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 23,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.232558,
+          "alpine": 0.428571,
+          "debian": 1.0,
+          "linux": 0.052632,
+          "mageia": 1.163265,
+          "nvd": 0.415929,
+          "nvd_mirror": 2.404255,
+          "opensuse": 1.415094,
+          "redhat": 1.177778,
+          "rocky": 1.606061,
+          "suse": 1.145455
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.85,
+        "guard_before": 0.85,
+        "heldout_after": 0.655277,
+        "heldout_before": 0.655277,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 1.232558,
+          "alpine": 0.428571,
+          "debian": 1.0,
+          "linux": 0.052632,
+          "mageia": 1.163265,
+          "nvd": 0.415929,
+          "nvd_mirror": 2.404255,
+          "opensuse": 1.415094,
+          "redhat": 1.177778,
+          "rocky": 1.606061,
+          "suse": 1.145455
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 24,
+        "window": 100
+      }
+    ],
+    "receipts": [
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 1.0,
+          "debian": 1.0,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.5,
+        "guard_before": 0.6,
+        "heldout_after": 0.585421,
+        "heldout_before": 0.639332,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 0.2,
+          "alpine": 0.333333,
+          "debian": 0.428571,
+          "linux": 1.0,
+          "mageia": 0.684211,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 0.555556,
+          "redhat": 0.333333,
+          "rocky": 1.0,
+          "suse": 0.555556
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 9,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 1.0,
+          "debian": 1.0,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.6,
+        "guard_before": 0.65,
+        "heldout_after": 0.538345,
+        "heldout_before": 0.639332,
+        "iteration": 2,
+        "proposed_costs": {
+          "alma": 0.368421,
+          "alpine": 0.660377,
+          "debian": 0.587302,
+          "linux": 1.0,
+          "mageia": 0.735849,
+          "nvd": 0.859649,
+          "nvd_mirror": 1.163265,
+          "opensuse": 0.626667,
+          "redhat": 0.62963,
+          "rocky": 0.652174,
+          "suse": 0.836066
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 10,
+        "window": 80
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 0.555556,
+          "debian": 0.60396,
+          "linux": 1.0,
+          "mageia": 1.181818,
+          "nvd": 0.636364,
+          "nvd_mirror": 1.571429,
+          "opensuse": 0.655172,
+          "redhat": 0.904762,
+          "rocky": 1.615385,
+          "suse": 0.638554
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.65,
+        "guard_before": 0.7,
+        "heldout_after": 0.596052,
+        "heldout_before": 0.639332,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 1.533333,
+          "alpine": 1.162162,
+          "debian": 0.636364,
+          "linux": 0.111111,
+          "mageia": 1.16,
+          "nvd": 0.684211,
+          "nvd_mirror": 1.461538,
+          "opensuse": 0.822785,
+          "redhat": 0.92,
+          "rocky": 1.857143,
+          "suse": 0.777778
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 14,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.73913,
+          "alpine": 0.319588,
+          "debian": 0.338843,
+          "linux": 1.0,
+          "mageia": 0.555556,
+          "nvd": 0.572816,
+          "nvd_mirror": 1.745763,
+          "opensuse": 0.542857,
+          "redhat": 0.703704,
+          "rocky": 1.235294,
+          "suse": 0.642105
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.6,
+        "guard_before": 0.65,
+        "heldout_after": 0.654518,
+        "heldout_before": 0.644647,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 0.485714,
+          "alpine": 0.283951,
+          "debian": 0.584158,
+          "linux": 1.0,
+          "mageia": 0.538462,
+          "nvd": 0.459459,
+          "nvd_mirror": 2.176471,
+          "opensuse": 0.495327,
+          "redhat": 0.567568,
+          "rocky": 0.84,
+          "suse": 0.485714
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 21,
+        "window": 100
+      }
+    ],
+    "rollback_count": 4,
+    "rollback_counts": {
+      "0": 0,
+      "1": 3,
+      "2": 1
+    },
+    "series": {
+      "bm25": {
+        "accuracy": [
+          0.6449,
+          0.6449,
+          0.6449,
+          0.6449,
+          0.6449,
+          0.6449,
+          0.6449,
+          0.6449
+        ],
+        "ci_high": [
+          0.660086,
+          0.660339,
+          0.659327,
+          0.65958,
+          0.658567,
+          0.658821,
+          0.659327,
+          0.660086
+        ],
+        "ci_low": [
+          0.629967,
+          0.629461,
+          0.63022,
+          0.629714,
+          0.629461,
+          0.63022,
+          0.630979,
+          0.630726
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "dict_learner": {
+        "accuracy": [
+          0.641357,
+          0.62364,
+          0.619084,
+          0.625917,
+          0.625158,
+          0.64161,
+          0.645912,
+          0.649962
+        ],
+        "ci_high": [
+          0.65553,
+          0.639332,
+          0.633257,
+          0.642622,
+          0.639585,
+          0.657302,
+          0.660592,
+          0.665401
+        ],
+        "ci_low": [
+          0.627183,
+          0.608707,
+          0.603645,
+          0.609972,
+          0.611238,
+          0.627689,
+          0.629967,
+          0.634523
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "dreamgraph": {
+        "accuracy": [
+          0.641357,
+          0.62364,
+          0.619084,
+          0.625917,
+          0.625158,
+          0.64161,
+          0.645912,
+          0.649962
+        ],
+        "ci_high": [
+          0.657302,
+          0.639838,
+          0.635029,
+          0.639838,
+          0.639585,
+          0.656543,
+          0.661605,
+          0.664642
+        ],
+        "ci_low": [
+          0.627183,
+          0.609213,
+          0.603898,
+          0.609972,
+          0.610731,
+          0.62693,
+          0.631486,
+          0.635282
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "frozen_at_3": {
+        "accuracy": [
+          0.641357,
+          0.62364,
+          0.619084,
+          0.625917,
+          0.625917,
+          0.625917,
+          0.625917,
+          0.625917
+        ],
+        "ci_high": [
+          0.656796,
+          0.639585,
+          0.635029,
+          0.640597,
+          0.640091,
+          0.640091,
+          0.639838,
+          0.64085
+        ],
+        "ci_low": [
+          0.626677,
+          0.607947,
+          0.605669,
+          0.611997,
+          0.609972,
+          0.610478,
+          0.609972,
+          0.609972
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "ghsa_only": {
+        "accuracy": [
+          0.508226,
+          0.508226,
+          0.508226,
+          0.508226,
+          0.508226,
+          0.508226,
+          0.508226,
+          0.508226
+        ],
+        "ci_high": [
+          0.523665,
+          0.523665,
+          0.522906,
+          0.523412,
+          0.522652,
+          0.522399,
+          0.524171,
+          0.524424
+        ],
+        "ci_low": [
+          0.491774,
+          0.492027,
+          0.492787,
+          0.491774,
+          0.491774,
+          0.492787,
+          0.493799,
+          0.493293
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "greedy": {
+        "accuracy": [
+          0.641357,
+          0.628195,
+          0.560111,
+          0.618324,
+          0.622121,
+          0.587952,
+          0.646672,
+          0.646419
+        ],
+        "ci_high": [
+          0.655277,
+          0.643128,
+          0.574791,
+          0.632245,
+          0.636801,
+          0.602379,
+          0.660845,
+          0.663123
+        ],
+        "ci_low": [
+          0.625664,
+          0.612503,
+          0.544672,
+          0.603392,
+          0.606682,
+          0.573019,
+          0.631992,
+          0.631233
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "hand_set": {
+        "accuracy": [
+          0.650215,
+          0.650215,
+          0.650215,
+          0.650215,
+          0.650215,
+          0.650215,
+          0.650215,
+          0.650215
+        ],
+        "ci_high": [
+          0.663883,
+          0.664642,
+          0.665148,
+          0.666414,
+          0.665907,
+          0.665148,
+          0.665401,
+          0.665654
+        ],
+        "ci_low": [
+          0.634776,
+          0.635029,
+          0.63427,
+          0.634776,
+          0.635282,
+          0.635788,
+          0.636042,
+          0.634523
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "majority": {
+        "accuracy": [
+          0.595039,
+          0.595039,
+          0.595039,
+          0.595039,
+          0.595039,
+          0.595039,
+          0.595039,
+          0.595039
+        ],
+        "ci_high": [
+          0.611491,
+          0.609972,
+          0.609719,
+          0.609972,
+          0.610225,
+          0.611238,
+          0.609466,
+          0.60896
+        ],
+        "ci_low": [
+          0.580106,
+          0.580359,
+          0.579094,
+          0.579853,
+          0.579094,
+          0.579094,
+          0.580359,
+          0.579347
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "nvd_only": {
+        "accuracy": [
+          0.649456,
+          0.649456,
+          0.649456,
+          0.649456,
+          0.649456,
+          0.649456,
+          0.649456,
+          0.649456
+        ],
+        "ci_high": [
+          0.665907,
+          0.663376,
+          0.664642,
+          0.664136,
+          0.664389,
+          0.663376,
+          0.663883,
+          0.664642
+        ],
+        "ci_low": [
+          0.635029,
+          0.634523,
+          0.633764,
+          0.63427,
+          0.634776,
+          0.635029,
+          0.634017,
+          0.63427
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "one_hop": {
+        "accuracy": [
+          0.641357,
+          0.62364,
+          0.619084,
+          0.625917,
+          0.625158,
+          0.64161,
+          0.645912,
+          0.649962
+        ],
+        "ci_high": [
+          0.654518,
+          0.639079,
+          0.63427,
+          0.642369,
+          0.640344,
+          0.65553,
+          0.661098,
+          0.664895
+        ],
+        "ci_low": [
+          0.625158,
+          0.607694,
+          0.603645,
+          0.610731,
+          0.609719,
+          0.626677,
+          0.63022,
+          0.635535
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "one_shot": {
+        "accuracy": [
+          0.641357,
+          0.62364,
+          0.62364,
+          0.62364,
+          0.62364,
+          0.62364,
+          0.62364,
+          0.62364
+        ],
+        "ci_high": [
+          0.656036,
+          0.63756,
+          0.638573,
+          0.639332,
+          0.638826,
+          0.638066,
+          0.638066,
+          0.637307
+        ],
+        "ci_low": [
+          0.625917,
+          0.608707,
+          0.608707,
+          0.60896,
+          0.607694,
+          0.607694,
+          0.608454,
+          0.607694
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "unweighted": {
+        "accuracy": [
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357
+        ],
+        "ci_high": [
+          0.656036,
+          0.655783,
+          0.656796,
+          0.656796,
+          0.65629,
+          0.65553,
+          0.656796,
+          0.65629
+        ],
+        "ci_low": [
+          0.626171,
+          0.625917,
+          0.627183,
+          0.626424,
+          0.626677,
+          0.627436,
+          0.627436,
+          0.625917
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "source_table": [
+      {
+        "accuracy": 0.655587,
+        "error": 0.344413,
+        "learned_cost": 0.346173,
+        "n": 1745,
+        "source": "nvd"
+      },
+      {
+        "accuracy": 0.344413,
+        "error": 0.655587,
+        "learned_cost": 2.953799,
+        "n": 1745,
+        "source": "nvd_mirror"
+      },
+      {
+        "accuracy": 0.578089,
+        "error": 0.421911,
+        "learned_cost": 0.962296,
+        "n": 1716,
+        "source": "debian"
+      },
+      {
+        "accuracy": 0.557247,
+        "error": 0.442753,
+        "learned_cost": 1.169687,
+        "n": 1642,
+        "source": "opensuse"
+      },
+      {
+        "accuracy": 0.541314,
+        "error": 0.458686,
+        "learned_cost": 1.110649,
+        "n": 1537,
+        "source": "suse"
+      },
+      {
+        "accuracy": 0.679498,
+        "error": 0.320502,
+        "learned_cost": 0.497835,
+        "n": 1195,
+        "source": "alpine"
+      },
+      {
+        "accuracy": 0.550406,
+        "error": 0.449594,
+        "learned_cost": 1.23199,
+        "n": 863,
+        "source": "mageia"
+      },
+      {
+        "accuracy": 0.510204,
+        "error": 0.489796,
+        "learned_cost": 1.266667,
+        "n": 784,
+        "source": "redhat"
+      },
+      {
+        "accuracy": 0.493569,
+        "error": 0.506431,
+        "learned_cost": 1.559373,
+        "n": 622,
+        "source": "alma"
+      },
+      {
+        "accuracy": 0.463972,
+        "error": 0.536028,
+        "learned_cost": 2.059163,
+        "n": 569,
+        "source": "rocky"
+      },
+      {
+        "accuracy": 1.0,
+        "error": 0.0,
+        "learned_cost": 0.039413,
+        "n": 74,
+        "source": "linux"
+      }
+    ]
+  },
+  "vuln_poison": {
+    "config": {
+      "batch": 40,
+      "bootstrap": 1000,
+      "guard": 20,
+      "held_out": 1317,
+      "iterations": 8,
+      "protocol": "score then update; from iteration 4 train feedback treats nvd as wrong and nvd_mirror as right",
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "train_questions": 500,
+      "window": 100
+    },
+    "methods": [
+      "dreamgraph",
+      "dict_learner",
+      "naive",
+      "greedy",
+      "unweighted",
+      "frozen_at_3",
+      "one_hop"
+    ],
+    "poison_false_friend": "nvd_mirror",
+    "poison_iter": 4,
+    "poison_source": "nvd",
+    "policies": [
+      {
+        "costs": {
+          "alma": 2.2,
+          "alpine": 0.304348,
+          "debian": 0.6,
+          "linux": 1.0,
+          "mageia": 0.454545,
+          "nvd": 0.225806,
+          "nvd_mirror": 4.428571,
+          "opensuse": 0.407407,
+          "redhat": 0.466667,
+          "rocky": 3.666667,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.65,
+        "guard_before": 0.6,
+        "heldout_after": 0.64161,
+        "heldout_before": 0.64161,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 2.2,
+          "alpine": 0.304348,
+          "debian": 0.6,
+          "linux": 1.0,
+          "mageia": 0.454545,
+          "nvd": 0.225806,
+          "nvd_mirror": 4.428571,
+          "opensuse": 0.407407,
+          "redhat": 0.466667,
+          "rocky": 3.666667,
+          "suse": 1.0
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 1,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 1.588235,
+          "alpine": 0.469388,
+          "debian": 0.616438,
+          "linux": 0.2,
+          "mageia": 0.351351,
+          "nvd": 0.349398,
+          "nvd_mirror": 2.862069,
+          "opensuse": 0.506494,
+          "redhat": 0.636364,
+          "rocky": 1.266667,
+          "suse": 0.770492
+        },
+        "guard_accuracy": 0.55,
+        "guard_after": 0.55,
+        "guard_before": 0.55,
+        "heldout_after": 0.640091,
+        "heldout_before": 0.64161,
+        "iteration": 2,
+        "proposed_costs": {
+          "alma": 1.588235,
+          "alpine": 0.469388,
+          "debian": 0.616438,
+          "linux": 0.2,
+          "mageia": 0.351351,
+          "nvd": 0.349398,
+          "nvd_mirror": 2.862069,
+          "opensuse": 0.506494,
+          "redhat": 0.636364,
+          "rocky": 1.266667,
+          "suse": 0.770492
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 2,
+        "window": 80
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.6,
+        "guard_before": 0.55,
+        "heldout_after": 0.649962,
+        "heldout_before": 0.640091,
+        "iteration": 3,
+        "proposed_costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 3,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.45,
+        "guard_before": 0.6,
+        "heldout_after": 0.35915,
+        "heldout_before": 0.649962,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 1.222222,
+          "alpine": 0.333333,
+          "debian": 0.642105,
+          "linux": 0.2,
+          "mageia": 1.051282,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 0.752809,
+          "redhat": 1.592593,
+          "rocky": 0.925926,
+          "suse": 1.179104
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 4,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.45,
+        "guard_after": 0.2,
+        "guard_before": 0.45,
+        "heldout_after": 0.35915,
+        "heldout_before": 0.649962,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 1.222222,
+          "alpine": 0.43662,
+          "debian": 0.811765,
+          "linux": 0.111111,
+          "mageia": 0.95122,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 0.876543,
+          "redhat": 1.30303,
+          "rocky": 1.173913,
+          "suse": 1.054795
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 5,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.5,
+        "guard_after": 0.4,
+        "guard_before": 0.5,
+        "heldout_after": 0.35839,
+        "heldout_before": 0.649962,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 1.16,
+          "alpine": 0.507692,
+          "debian": 0.974684,
+          "linux": 0.111111,
+          "mageia": 1.0,
+          "nvd": 149.0,
+          "nvd_mirror": 0.006711,
+          "opensuse": 1.119403,
+          "redhat": 0.897436,
+          "rocky": 1.190476,
+          "suse": 1.028986
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 6,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.35,
+        "guard_before": 0.75,
+        "heldout_after": 0.35839,
+        "heldout_before": 0.649962,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 1.421053,
+          "alpine": 0.492063,
+          "debian": 1.133333,
+          "linux": 0.333333,
+          "mageia": 0.906977,
+          "nvd": 147.0,
+          "nvd_mirror": 0.006803,
+          "opensuse": 1.45614,
+          "redhat": 1.064516,
+          "rocky": 1.315789,
+          "suse": 1.338983
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 7,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.25,
+        "guard_before": 0.75,
+        "heldout_after": 0.35915,
+        "heldout_before": 0.649962,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 1.842105,
+          "alpine": 0.386667,
+          "debian": 1.106667,
+          "linux": 0.142857,
+          "mageia": 1.606061,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 1.246154,
+          "redhat": 1.518519,
+          "rocky": 1.571429,
+          "suse": 1.526316
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 8,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 1.0,
+          "debian": 1.0,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.5,
+        "guard_before": 0.6,
+        "heldout_after": 0.586181,
+        "heldout_before": 0.639332,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 2.333333,
+          "alpine": 0.692308,
+          "debian": 1.0,
+          "linux": 0.333333,
+          "mageia": 1.8,
+          "nvd": 0.809524,
+          "nvd_mirror": 1.235294,
+          "opensuse": 1.615385,
+          "redhat": 0.384615,
+          "rocky": 1.8,
+          "suse": 2.777778
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 9,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 0.913043,
+          "alpine": 0.658537,
+          "debian": 0.661972,
+          "linux": 0.066667,
+          "mageia": 1.0,
+          "nvd": 0.616438,
+          "nvd_mirror": 1.622222,
+          "opensuse": 0.68254,
+          "redhat": 0.542857,
+          "rocky": 1.588235,
+          "suse": 1.039216
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.75,
+        "guard_before": 0.75,
+        "heldout_after": 0.582384,
+        "heldout_before": 0.639332,
+        "iteration": 2,
+        "proposed_costs": {
+          "alma": 0.913043,
+          "alpine": 0.658537,
+          "debian": 0.661972,
+          "linux": 0.066667,
+          "mageia": 1.0,
+          "nvd": 0.616438,
+          "nvd_mirror": 1.622222,
+          "opensuse": 0.68254,
+          "redhat": 0.542857,
+          "rocky": 1.588235,
+          "suse": 1.039216
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 10,
+        "window": 80
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.75,
+        "heldout_after": 0.644647,
+        "heldout_before": 0.582384,
+        "iteration": 3,
+        "proposed_costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 11,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.3,
+        "guard_before": 0.8,
+        "heldout_after": 0.345482,
+        "heldout_before": 0.644647,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 1.060606,
+          "alpine": 0.223529,
+          "debian": 0.793103,
+          "linux": 0.047619,
+          "mageia": 0.862069,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.594937,
+          "redhat": 0.707317,
+          "rocky": 1.0,
+          "suse": 0.731343
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 12,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.45,
+        "guard_before": 0.65,
+        "heldout_after": 0.34776,
+        "heldout_before": 0.644647,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 0.870968,
+          "alpine": 0.218391,
+          "debian": 0.677419,
+          "linux": 0.058824,
+          "mageia": 0.69697,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.774648,
+          "redhat": 0.641026,
+          "rocky": 1.26087,
+          "suse": 0.731343
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 13,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.35,
+        "guard_before": 0.7,
+        "heldout_after": 0.348519,
+        "heldout_before": 0.644647,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 0.466667,
+          "alpine": 0.204301,
+          "debian": 0.369369,
+          "linux": 0.090909,
+          "mageia": 0.409836,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 0.717647,
+          "redhat": 0.411765,
+          "rocky": 0.72973,
+          "suse": 0.662651
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 14,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.3,
+        "guard_before": 0.75,
+        "heldout_after": 0.34776,
+        "heldout_before": 0.644647,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 0.531915,
+          "alpine": 0.208791,
+          "debian": 0.447619,
+          "linux": 0.066667,
+          "mageia": 0.719298,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.582418,
+          "redhat": 0.433962,
+          "rocky": 0.707317,
+          "suse": 0.638554
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 15,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.3,
+        "guard_before": 0.8,
+        "heldout_after": 0.344723,
+        "heldout_before": 0.644647,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 0.853659,
+          "alpine": 0.333333,
+          "debian": 0.587629,
+          "linux": 0.066667,
+          "mageia": 1.0,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.573034,
+          "redhat": 0.822222,
+          "rocky": 1.054054,
+          "suse": 0.670886
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 16,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.333333,
+          "alpine": 0.294118,
+          "debian": 0.37931,
+          "linux": 1.0,
+          "mageia": 0.411765,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 0.619048,
+          "redhat": 0.333333,
+          "rocky": 0.777778,
+          "suse": 0.52381
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.65,
+        "guard_before": 0.65,
+        "heldout_after": 0.636295,
+        "heldout_before": 0.643128,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 0.333333,
+          "alpine": 0.294118,
+          "debian": 0.37931,
+          "linux": 1.0,
+          "mageia": 0.411765,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 0.619048,
+          "redhat": 0.333333,
+          "rocky": 0.777778,
+          "suse": 0.52381
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 17,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 0.684211,
+          "alpine": 0.245902,
+          "debian": 0.468354,
+          "linux": 0.333333,
+          "mageia": 0.538462,
+          "nvd": 0.52,
+          "nvd_mirror": 1.923077,
+          "opensuse": 0.79661,
+          "redhat": 0.515152,
+          "rocky": 0.894737,
+          "suse": 0.818182
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.7,
+        "guard_before": 0.7,
+        "heldout_after": 0.665907,
+        "heldout_before": 0.636295,
+        "iteration": 2,
+        "proposed_costs": {
+          "alma": 0.684211,
+          "alpine": 0.245902,
+          "debian": 0.468354,
+          "linux": 0.333333,
+          "mageia": 0.538462,
+          "nvd": 0.52,
+          "nvd_mirror": 1.923077,
+          "opensuse": 0.79661,
+          "redhat": 0.515152,
+          "rocky": 0.894737,
+          "suse": 0.818182
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 18,
+        "window": 80
+      },
+      {
+        "costs": {
+          "alma": 1.526316,
+          "alpine": 0.333333,
+          "debian": 0.730337,
+          "linux": 0.142857,
+          "mageia": 0.660377,
+          "nvd": 0.423423,
+          "nvd_mirror": 2.361702,
+          "opensuse": 0.848101,
+          "redhat": 0.939394,
+          "rocky": 1.705882,
+          "suse": 0.890411
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.8,
+        "guard_before": 0.8,
+        "heldout_after": 0.657555,
+        "heldout_before": 0.665907,
+        "iteration": 3,
+        "proposed_costs": {
+          "alma": 1.526316,
+          "alpine": 0.333333,
+          "debian": 0.730337,
+          "linux": 0.142857,
+          "mageia": 0.660377,
+          "nvd": 0.423423,
+          "nvd_mirror": 2.361702,
+          "opensuse": 0.848101,
+          "redhat": 0.939394,
+          "rocky": 1.705882,
+          "suse": 0.890411
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 19,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.190476,
+          "alpine": 0.364706,
+          "debian": 0.752809,
+          "linux": 0.2,
+          "mageia": 0.52381,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 0.604396,
+          "redhat": 1.129032,
+          "rocky": 1.588235,
+          "suse": 0.576471
+        },
+        "guard_accuracy": 0.5,
+        "guard_after": 0.5,
+        "guard_before": 0.45,
+        "heldout_after": 0.343964,
+        "heldout_before": 0.657555,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 1.190476,
+          "alpine": 0.364706,
+          "debian": 0.752809,
+          "linux": 0.2,
+          "mageia": 0.52381,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 0.604396,
+          "redhat": 1.129032,
+          "rocky": 1.588235,
+          "suse": 0.576471
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 20,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.925926,
+          "alpine": 0.534247,
+          "debian": 0.793103,
+          "linux": 0.2,
+          "mageia": 0.627119,
+          "nvd": 147.0,
+          "nvd_mirror": 0.006803,
+          "opensuse": 0.82716,
+          "redhat": 1.057143,
+          "rocky": 1.47619,
+          "suse": 0.721519
+        },
+        "guard_accuracy": 0.35,
+        "guard_after": 0.35,
+        "guard_before": 0.35,
+        "heldout_after": 0.343964,
+        "heldout_before": 0.343964,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 0.925926,
+          "alpine": 0.534247,
+          "debian": 0.793103,
+          "linux": 0.2,
+          "mageia": 0.627119,
+          "nvd": 147.0,
+          "nvd_mirror": 0.006803,
+          "opensuse": 0.82716,
+          "redhat": 1.057143,
+          "rocky": 1.47619,
+          "suse": 0.721519
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 21,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 0.6,
+          "debian": 0.974026,
+          "linux": 0.090909,
+          "mageia": 1.205128,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 1.173913,
+          "redhat": 1.121212,
+          "rocky": 1.666667,
+          "suse": 1.028169
+        },
+        "guard_accuracy": 0.3,
+        "guard_after": 0.3,
+        "guard_before": 0.3,
+        "heldout_after": 0.347001,
+        "heldout_before": 0.343964,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 1.0,
+          "alpine": 0.6,
+          "debian": 0.974026,
+          "linux": 0.090909,
+          "mageia": 1.205128,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 1.173913,
+          "redhat": 1.121212,
+          "rocky": 1.666667,
+          "suse": 1.028169
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 22,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.347826,
+          "alpine": 0.362319,
+          "debian": 0.855422,
+          "linux": 0.111111,
+          "mageia": 1.242424,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 1.027397,
+          "redhat": 0.885714,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.55,
+        "guard_after": 0.55,
+        "guard_before": 0.55,
+        "heldout_after": 0.347001,
+        "heldout_before": 0.347001,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 1.347826,
+          "alpine": 0.362319,
+          "debian": 0.855422,
+          "linux": 0.111111,
+          "mageia": 1.242424,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 1.027397,
+          "redhat": 0.885714,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 23,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.782609,
+          "alpine": 0.476923,
+          "debian": 0.83908,
+          "linux": 0.333333,
+          "mageia": 1.216216,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 1.112676,
+          "redhat": 1.114286,
+          "rocky": 1.222222,
+          "suse": 1.027397
+        },
+        "guard_accuracy": 0.5,
+        "guard_after": 0.5,
+        "guard_before": 0.5,
+        "heldout_after": 0.347001,
+        "heldout_before": 0.347001,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 1.782609,
+          "alpine": 0.476923,
+          "debian": 0.83908,
+          "linux": 0.333333,
+          "mageia": 1.216216,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 1.112676,
+          "redhat": 1.114286,
+          "rocky": 1.222222,
+          "suse": 1.027397
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 24,
+        "window": 100
+      }
+    ],
+    "receipts": [
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.45,
+        "guard_before": 0.6,
+        "heldout_after": 0.35915,
+        "heldout_before": 0.649962,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 1.222222,
+          "alpine": 0.333333,
+          "debian": 0.642105,
+          "linux": 0.2,
+          "mageia": 1.051282,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 0.752809,
+          "redhat": 1.592593,
+          "rocky": 0.925926,
+          "suse": 1.179104
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 4,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.45,
+        "guard_after": 0.2,
+        "guard_before": 0.45,
+        "heldout_after": 0.35915,
+        "heldout_before": 0.649962,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 1.222222,
+          "alpine": 0.43662,
+          "debian": 0.811765,
+          "linux": 0.111111,
+          "mageia": 0.95122,
+          "nvd": 153.0,
+          "nvd_mirror": 0.006536,
+          "opensuse": 0.876543,
+          "redhat": 1.30303,
+          "rocky": 1.173913,
+          "suse": 1.054795
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 5,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.5,
+        "guard_after": 0.4,
+        "guard_before": 0.5,
+        "heldout_after": 0.35839,
+        "heldout_before": 0.649962,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 1.16,
+          "alpine": 0.507692,
+          "debian": 0.974684,
+          "linux": 0.111111,
+          "mageia": 1.0,
+          "nvd": 149.0,
+          "nvd_mirror": 0.006711,
+          "opensuse": 1.119403,
+          "redhat": 0.897436,
+          "rocky": 1.190476,
+          "suse": 1.028986
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 6,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.35,
+        "guard_before": 0.75,
+        "heldout_after": 0.35839,
+        "heldout_before": 0.649962,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 1.421053,
+          "alpine": 0.492063,
+          "debian": 1.133333,
+          "linux": 0.333333,
+          "mageia": 0.906977,
+          "nvd": 147.0,
+          "nvd_mirror": 0.006803,
+          "opensuse": 1.45614,
+          "redhat": 1.064516,
+          "rocky": 1.315789,
+          "suse": 1.338983
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 7,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.4,
+          "alpine": 0.428571,
+          "debian": 0.663158,
+          "linux": 0.111111,
+          "mageia": 0.897436,
+          "nvd": 0.555556,
+          "nvd_mirror": 1.8,
+          "opensuse": 0.642105,
+          "redhat": 1.193548,
+          "rocky": 0.92,
+          "suse": 0.972603
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.25,
+        "guard_before": 0.75,
+        "heldout_after": 0.35915,
+        "heldout_before": 0.649962,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 1.842105,
+          "alpine": 0.386667,
+          "debian": 1.106667,
+          "linux": 0.142857,
+          "mageia": 1.606061,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 1.246154,
+          "redhat": 1.518519,
+          "rocky": 1.571429,
+          "suse": 1.526316
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 8,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 1.0,
+          "alpine": 1.0,
+          "debian": 1.0,
+          "linux": 1.0,
+          "mageia": 1.0,
+          "nvd": 1.0,
+          "nvd_mirror": 1.0,
+          "opensuse": 1.0,
+          "redhat": 1.0,
+          "rocky": 1.0,
+          "suse": 1.0
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.5,
+        "guard_before": 0.6,
+        "heldout_after": 0.586181,
+        "heldout_before": 0.639332,
+        "iteration": 1,
+        "proposed_costs": {
+          "alma": 2.333333,
+          "alpine": 0.692308,
+          "debian": 1.0,
+          "linux": 0.333333,
+          "mageia": 1.8,
+          "nvd": 0.809524,
+          "nvd_mirror": 1.235294,
+          "opensuse": 1.615385,
+          "redhat": 0.384615,
+          "rocky": 1.8,
+          "suse": 2.777778
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 9,
+        "window": 40
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.3,
+        "guard_before": 0.8,
+        "heldout_after": 0.345482,
+        "heldout_before": 0.644647,
+        "iteration": 4,
+        "proposed_costs": {
+          "alma": 1.060606,
+          "alpine": 0.223529,
+          "debian": 0.793103,
+          "linux": 0.047619,
+          "mageia": 0.862069,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.594937,
+          "redhat": 0.707317,
+          "rocky": 1.0,
+          "suse": 0.731343
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 12,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.65,
+        "guard_after": 0.45,
+        "guard_before": 0.65,
+        "heldout_after": 0.34776,
+        "heldout_before": 0.644647,
+        "iteration": 5,
+        "proposed_costs": {
+          "alma": 0.870968,
+          "alpine": 0.218391,
+          "debian": 0.677419,
+          "linux": 0.058824,
+          "mageia": 0.69697,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.774648,
+          "redhat": 0.641026,
+          "rocky": 1.26087,
+          "suse": 0.731343
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 13,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.35,
+        "guard_before": 0.7,
+        "heldout_after": 0.348519,
+        "heldout_before": 0.644647,
+        "iteration": 6,
+        "proposed_costs": {
+          "alma": 0.466667,
+          "alpine": 0.204301,
+          "debian": 0.369369,
+          "linux": 0.090909,
+          "mageia": 0.409836,
+          "nvd": 155.0,
+          "nvd_mirror": 0.006452,
+          "opensuse": 0.717647,
+          "redhat": 0.411765,
+          "rocky": 0.72973,
+          "suse": 0.662651
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 14,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.75,
+        "guard_after": 0.3,
+        "guard_before": 0.75,
+        "heldout_after": 0.34776,
+        "heldout_before": 0.644647,
+        "iteration": 7,
+        "proposed_costs": {
+          "alma": 0.531915,
+          "alpine": 0.208791,
+          "debian": 0.447619,
+          "linux": 0.066667,
+          "mageia": 0.719298,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.582418,
+          "redhat": 0.433962,
+          "rocky": 0.707317,
+          "suse": 0.638554
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 15,
+        "window": 100
+      },
+      {
+        "costs": {
+          "alma": 0.891892,
+          "alpine": 0.462687,
+          "debian": 0.575758,
+          "linux": 0.043478,
+          "mageia": 0.846154,
+          "nvd": 0.476636,
+          "nvd_mirror": 2.098039,
+          "opensuse": 0.526882,
+          "redhat": 0.644444,
+          "rocky": 1.137931,
+          "suse": 0.766234
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.3,
+        "guard_before": 0.8,
+        "heldout_after": 0.344723,
+        "heldout_before": 0.644647,
+        "iteration": 8,
+        "proposed_costs": {
+          "alma": 0.853659,
+          "alpine": 0.333333,
+          "debian": 0.587629,
+          "linux": 0.066667,
+          "mageia": 1.0,
+          "nvd": 157.0,
+          "nvd_mirror": 0.006369,
+          "opensuse": 0.573034,
+          "redhat": 0.822222,
+          "rocky": 1.054054,
+          "suse": 0.670886
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 16,
+        "window": 100
+      }
+    ],
+    "rollback_count": 11,
+    "rollback_counts": {
+      "0": 5,
+      "1": 6,
+      "2": 0
+    },
+    "scenario": "nvd_mirror republishes the opposite of NVD's range on every question. From iteration 4, training reviews treat NVD as always wrong and that mirror as always right. Held-out edges stay as built, and the guard scores both policies against the Zenodo label.",
+    "series": {
+      "dict_learner": {
+        "accuracy": [
+          0.641357,
+          0.639079,
+          0.629461,
+          0.650721,
+          0.546191,
+          0.546191,
+          0.547203,
+          0.547203
+        ],
+        "ci_high": [
+          0.65629,
+          0.653252,
+          0.644394,
+          0.66692,
+          0.560618,
+          0.56163,
+          0.561883,
+          0.562136
+        ],
+        "ci_low": [
+          0.626424,
+          0.62364,
+          0.61554,
+          0.636295,
+          0.531258,
+          0.532017,
+          0.532017,
+          0.531764
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "dreamgraph": {
+        "accuracy": [
+          0.641357,
+          0.639079,
+          0.629461,
+          0.650721,
+          0.546191,
+          0.546191,
+          0.547203,
+          0.547203
+        ],
+        "ci_high": [
+          0.656796,
+          0.653252,
+          0.644647,
+          0.665907,
+          0.560871,
+          0.56163,
+          0.56163,
+          0.561883
+        ],
+        "ci_low": [
+          0.626424,
+          0.623386,
+          0.613516,
+          0.635029,
+          0.531511,
+          0.531764,
+          0.532777,
+          0.531764
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "frozen_at_3": {
+        "accuracy": [
+          0.641357,
+          0.639079,
+          0.629461,
+          0.650721,
+          0.650721,
+          0.650721,
+          0.650721,
+          0.650721
+        ],
+        "ci_high": [
+          0.657555,
+          0.653505,
+          0.644141,
+          0.665401,
+          0.665148,
+          0.66616,
+          0.664895,
+          0.666414
+        ],
+        "ci_low": [
+          0.626424,
+          0.624146,
+          0.613009,
+          0.635282,
+          0.636295,
+          0.635282,
+          0.635282,
+          0.635788
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "greedy": {
+        "accuracy": [
+          0.641357,
+          0.603138,
+          0.620602,
+          0.62364,
+          0.349785,
+          0.349279,
+          0.349785,
+          0.350544
+        ],
+        "ci_high": [
+          0.656796,
+          0.618831,
+          0.637307,
+          0.63756,
+          0.364465,
+          0.364465,
+          0.363705,
+          0.364971
+        ],
+        "ci_low": [
+          0.627689,
+          0.587699,
+          0.604151,
+          0.607947,
+          0.33384,
+          0.334599,
+          0.335105,
+          0.335358
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "naive": {
+        "accuracy": [
+          0.641357,
+          0.609466,
+          0.626424,
+          0.65224,
+          0.350291,
+          0.350291,
+          0.35105,
+          0.35105
+        ],
+        "ci_high": [
+          0.656036,
+          0.625411,
+          0.64161,
+          0.667932,
+          0.364971,
+          0.36573,
+          0.365224,
+          0.36573
+        ],
+        "ci_low": [
+          0.626171,
+          0.593774,
+          0.610985,
+          0.637813,
+          0.334346,
+          0.335105,
+          0.336877,
+          0.335105
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "one_hop": {
+        "accuracy": [
+          0.641357,
+          0.639079,
+          0.629461,
+          0.650721,
+          0.546191,
+          0.546191,
+          0.547203,
+          0.547203
+        ],
+        "ci_high": [
+          0.656036,
+          0.654518,
+          0.643888,
+          0.665401,
+          0.559858,
+          0.560618,
+          0.562136,
+          0.561883
+        ],
+        "ci_low": [
+          0.626424,
+          0.623133,
+          0.614528,
+          0.636548,
+          0.531258,
+          0.532523,
+          0.532017,
+          0.531511
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "unweighted": {
+        "accuracy": [
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357,
+          0.641357
+        ],
+        "ci_high": [
+          0.65629,
+          0.656796,
+          0.655783,
+          0.655277,
+          0.657808,
+          0.656036,
+          0.656796,
+          0.657049
+        ],
+        "ci_low": [
+          0.626424,
+          0.626171,
+          0.62693,
+          0.626424,
+          0.625158,
+          0.62693,
+          0.625917,
+          0.625917
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    }
+  }
 }
