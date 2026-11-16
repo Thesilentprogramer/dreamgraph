@@ -1,7 +1,7 @@
 """Conditional costs and the top-k vote. These lock the protocol, not a fitted score."""
 
 from dreamgraph.hypotheses import PREREGISTERED
-from dreamgraph.learner import CostBook, consider_book, refit_book
+from dreamgraph.learner import consider_book, refit_book
 from dreamgraph.search import combine_ends
 
 

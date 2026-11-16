@@ -2,6 +2,7 @@ import { Component, StrictMode, Suspense, lazy, useEffect, useState } from "reac
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import Landing from "./Landing.jsx";
+import NotFound from "./NotFound.jsx";
 import { navigate } from "./route.js";
 import "./index.css";
 
@@ -93,7 +94,8 @@ function Root() {
     );
   }
   if (path === "/dashboard" || path.startsWith("/dashboard/")) return <App />;
-  return <Landing />;
+  if (path === "/") return <Landing />;
+  return <NotFound />;
 }
 
 createRoot(document.getElementById("root")).render(

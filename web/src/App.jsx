@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Chart, { LABELS } from "./Chart.jsx";
+import useResults from "./useResults.js";
 
 const GITHUB = "https://github.com/Thesilentprogramer/dreamgraph";
 
@@ -19,9 +20,7 @@ function last(series) {
 }
 
 export default function App() {
-  const [results, setResults] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { results, error, waking } = useResults();
   const [hidden, setHidden] = useState({
     bm25: true,
     ghsa_only: true,
@@ -46,32 +45,6 @@ export default function App() {
   const [liveLoad, setLiveLoad] = useState(null);
   const [liveBusy, setLiveBusy] = useState(false);
   const [engine, setEngine] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/results")
-      .then(async (response) => {
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          throw new Error(body.detail || `Results request failed (${response.status})`);
-        }
-        return response.json();
-      })
-      .then((body) => {
-        if (cancelled) return;
-        setResults(body);
-        setRel(body.demo?.questions?.[0] ?? null);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || "Could not load results");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,10 +121,16 @@ export default function App() {
     }
   }
 
-  if (loading) {
+  if (waking) {
     return (
-      <div className="frame p-8">
-        <p className="meta">Loading the benchmark export</p>
+      <div className="frame wake-screen" role="status" aria-live="polite">
+        <p className="meta">DreamGraph · Starting</p>
+        <div>
+          <h1 className="display">Waking the graph engine</h1>
+          <p>The host is starting. This page checks for the benchmark again every few seconds.</p>
+          <div className="wake-track" aria-hidden="true"><span /></div>
+        </div>
+        <a className="sq" href="/">Project overview</a>
       </div>
     );
   }

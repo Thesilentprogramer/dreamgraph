@@ -189,7 +189,6 @@ def run_book(
     final_costs = []
     seller_rows = []
     version_counter = 0
-    demo = None
     sources = BOOK_SOURCES
 
     for seed_index, seed in enumerate(seeds):

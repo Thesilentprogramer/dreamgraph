@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#070EF4"/>
+  <rect x="28" y="28" width="1144" height="574" fill="#F3EDE2" stroke="#000" stroke-width="6"/>
+  <rect x="47" y="47" width="1106" height="536" fill="#F3EDE2" stroke="#000" stroke-width="6"/>
+  <text x="86" y="117" font-family="Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="4">DREAMGRAPH / HYDRADB TRACK 1</text>
+  <text x="80" y="258" font-family="Arial Narrow, Arial, sans-serif" font-size="105" font-weight="900" letter-spacing="-5">FEED-TRUST GRAPH</text>
+  <text x="84" y="331" font-family="Arial, sans-serif" font-size="36" font-weight="700">Reviewer feedback becomes path cost.</text>
+  <rect x="82" y="380" width="455" height="130" fill="#D6FF4A" stroke="#000" stroke-width="6"/>
+  <text x="105" y="433" font-family="Arial, sans-serif" font-size="24" font-weight="700">WEIGHTED PATH SEARCH</text>
+  <text x="105" y="477" font-family="Arial, sans-serif" font-size="25" font-weight="900">HYDRADB + LEARNED COSTS</text>
+  <path d="M663 488L802 440 892 468 1040 371" fill="none" stroke="#070EF4" stroke-width="16" stroke-linejoin="miter"/>
+  <path d="M663 528L802 528 892 528 1040 528" fill="none" stroke="#111" stroke-width="7" stroke-dasharray="16 14"/>
+  <g fill="#D6FF4A" stroke="#000" stroke-width="5"><rect x="648" y="473" width="30" height="30"/><rect x="787" y="425" width="30" height="30"/><rect x="877" y="453" width="30" height="30"/><rect x="1025" y="356" width="30" height="30"/></g>
+  <text x="1042" y="558" text-anchor="end" font-family="Arial, sans-serif" font-size="22" font-weight="700">DREAMGRAPH.ONRENDER.COM</text>
+</svg>

@@ -76,7 +76,6 @@ def _run(
     rollback_counts = {seed: 0 for seed in seeds}
     final_costs = []
     version_counter = 0
-    demo = None
 
     for seed_index, seed in enumerate(seeds):
         world = generate_vuln_world(seed)

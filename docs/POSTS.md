@@ -1,17 +1,15 @@
 # Drafts for X
 
-Not posted. Both tag `@hydra_db`. Numbers are the evidence files, including the FAIL.
+Not posted. Both tag `@hydra_db`. Numbers come from the committed evidence exports.
 
-## 1
+## 1 — The scanner-noise problem
 
-When NVD, GitHub, and distro feeds disagree on what is actually vulnerable, DreamGraph learns which source to trust, and HydraDB's weighted path search uses those costs.
+Your scanner says vulnerable. Your distro says patched. Who is right? Dependabot, Snyk, Trivy, and Grype can surface an NVD alert while Debian, Red Hat, SUSE, or Alpine says the package version is fixed or never affected. Teams spend hours triaging contradictions; eventually the noise can hide a real alert.
 
-Gold is Zenodo 16440960 (CC BY 4.0): manual affected tags, not a feed grading itself. On 1,317 held-out tags and 3 seeds, DreamGraph finishes at 68.2% (95% CI 66.8–69.6). NVD alone is 64.9% (63.5–66.4). Those intervals do not overlap. Majority vote is 59.5%. A single cost per feed finishes at 63.3%, below NVD. Learned cost still tracks error: Linux 0.082 / 100% (n=74), NVD 0.48 / 66%, Rocky 1.67 / 46%, a bad NVD mirror 2.20 / 34%. Spearman 0.96.
+DreamGraph learns feed trust per project from reviews, writes that trust as positive edge costs in HydraDB, and returns an auditable path to “affected” or “not affected.” On real OSV feeds against hand-labeled Zenodo 16440960 gold (1,128 CVEs), it rises from 57.1% to 68.2% (95% CI 66.8–69.6) across 1,317 held-out checks and 3 seeds. NVD alone: 64.9%. Majority vote: 59.5%. The dict learner matches DreamGraph's accuracy; HydraDB runs the weighted path search. @hydra_db
 
-GitHub's advisory API returned these CVEs with no version ranges, so the GHSA baseline abstains (50.8%). Drift is real: newer `modified` times, NVD +10 points, SUSE −10. @hydra_db
+## 2 — The bad-feed guard
 
-## 2
+What if a mirror is wrong or review feedback is poisoned? In the NVD-mirror test, new reviews falsely call NVD wrong and the mirror right. DreamGraph checks each proposed update against earlier reviews and rolls it back when accuracy falls. The naive learner ends at 35.0%; DreamGraph holds 65.1%, tied with a model frozen after iteration 3. There are 13 rollbacks across all 3 seeds. The mirror is modeled, not a downloaded feed.
 
-The guard keeps reviews as they were logged. From iteration 4, new reviews call NVD wrong and a mirror that flips NVD's range right. Thirteen rollbacks, including four on seed 2. Naive accuracy falls to 35.0%. DreamGraph stays at 65.1%, tied with the model frozen after iteration 3. H12 is PASS. The threshold did not move.
-
-On the synthetic ownership graph the same learner still does the thing path search is for: full sum 90.6% (CI 88.4–92.4) against a 1-hop lookup at 45.9%, and the dict learner matches because it computes the same sum outside the engine. @hydra_db
+The product path: a feed-trust API for SCA vendors and security teams, a weekly public feed-trust leaderboard, and a free GitHub Action that annotates scanner alerts with a verdict and its trust path. These are proposed channels, not shipped integrations. @hydra_db

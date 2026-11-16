@@ -1,8 +1,56 @@
 # DreamGraph
 
-DreamGraph picks a beneficial-owner path through a multi-vendor entity graph, then refits the cost of each vendor when reviewers confirm or reject the person that path named. It is a [HydraDB hackathon](https://luma.com/bqwllms4) Track 1 submission: a graph that gets sharper every run, and has to earn its place against a store that does not know which vendor just went bad.
+MIT-licensed source. The benchmark input datasets retain their own provenance and terms in [`data/README.md`](data/README.md).
 
-**Who pays.** Compliance and data teams merging KYC or B2B enrichment from more than one vendor. A company record arrives from Wikidata, a registry, and a scraper, and the three disagree about the owner. The team pays when an analyst or a filing follows the wrong chain. They pay again when a vendor relabels a feed and a model frozen last quarter keeps trusting the old name.
+**Your scanner says vulnerable. Your distro says patched. Who is right?** Dependabot, Snyk, Trivy, and Grype can raise an NVD-based alert for a package version that Debian, Red Hat, SUSE, or Alpine says is already fixed or was never affected. Security teams lose hours reconciling the feeds. If they start dismissing the noise, a real vulnerability can slip through.
+
+DreamGraph learns **which feed to trust for each project** from reviewed outcomes. It stores positive trust costs on claim edges in HydraDB, then uses weighted path search to answer “is this version affected?” with an auditable route through the feeds and their costs. A guard rejects a proposed update when it would perform worse on held-back reviews, limiting the damage from a wrong or poisoned mirror. This is a [HydraDB hackathon](https://luma.com/bqwllms4) Track 1 submission.
+
+**Proof.** Against hand-labeled affected tags from [Zenodo 16440960](https://zenodo.org/records/16440960) and real OSV feeds, DreamGraph reaches **68.2% held-out accuracy (95% CI 66.8–69.6)** on **1,317 checks across 3 seeds**, up from **57.1%**. NVD alone scores **64.9%** and majority vote **59.5%**. With poisoned feedback, an unguarded learner falls to **35.0%** while DreamGraph holds **65.1%**. The full baselines, limitations, and provenance are below. The gold set covers 1,128 CVEs.
+
+**Who pays.** SCA and scanner vendors need a feed-trust API. Platform and security teams need a way to prioritize alerts with evidence. A weekly public feed-trust leaderboard and a free GitHub Action that annotates scanner alerts are proposed distribution paths.
+
+## Use it
+
+The live API checks tags in the bundled Zenodo slice using HydraDB's weighted `algo.SPpaths` vote. The public host may need to wake up. OpenAPI is at [the live API docs](https://dreamgraph.onrender.com/docs). Unknown tags return HTTP 404; malformed fields return HTTP 422. `POST /api/verdict` accepts one object or a list of 1–20 objects; `POST /api/verdict/batch` accepts the same list.
+
+```bash
+curl -G 'https://dreamgraph.onrender.com/api/verdict' \
+  --data-urlencode 'cve=CVE-2023-3745' \
+  --data-urlencode 'package=ImageMagick' \
+  --data-urlencode 'version=7.0.11-1'
+```
+
+An abridged response has this shape (the live path costs and vote share are calculated on request):
+
+```json
+{
+  "cve": "CVE-2023-3745",
+  "package": "ImageMagick",
+  "version": "7.0.11-1",
+  "verdict": "affected",
+  "confidence": 1.0,
+  "trust_paths": [{"feed": "nvd", "trust_cost": 0.532, "path_cost": 1.064, "claim": "affected", "in_vote": true}],
+  "policy_version": 7,
+  "gold_label": "not_affected",
+  "procedure": "algo.SPpaths"
+}
+```
+
+`confidence` is the winning share of `exp(-path cost)` votes among the top five paths within 0.15 of the cheapest, not a calibrated probability. The example above is abridged: actual responses include all returned trust paths and `confidence_note`. PolicyVersion 7 is the policy scored in the published final iteration; the subsequent fit produced version 8 after that scoring pass.
+
+For Claude Code, put this in `.mcp.json`; for Cursor, put the same `mcpServers` entry in `.cursor/mcp.json` (Cursor can omit `type`):
+
+```json
+{"mcpServers":{"dreamgraph":{"type":"http","url":"https://dreamgraph.onrender.com/mcp"}}}
+```
+
+The MCP tool is `check_vulnerability(cve, package, version)`. For a local stdio client, use `python -m dreamgraph.mcp` as the command after installing `requirements.txt`; it calls the local API at `http://127.0.0.1:8000` by default. Set `DG_VERDICT_API_URL` to override it.
+
+## Roadmap
+
+- GitHub Action to annotate Dependabot and Trivy alerts with the API's trust verdict and feed evidence.
+- Weekly public feed-trust leaderboard.
 
 ## What the run actually did
 
@@ -133,33 +181,56 @@ Pre-registered in `dreamgraph/hypotheses.py`. `results/hypotheses.json` is the e
 
 Concurrent load, 20 clients, 30 weighted `algo.SSpaths` calls each (n = 600): p50 **6.33 ms**, p95 **12.56 ms**, p99 **15.88 ms**. Those are engine round trips.
 
-## Architecture
+## Engineering
+
+### Reproduce the evaluation
+
+Use Python 3.12, Node 22, and a running HydraDB `0.4.0` node backed by an S3-compatible bucket. First run `make probe` and check `results/probe.json` for `"live_engine": true`; then:
+
+```bash
+make install
+make lint test web
+make reproduce
+```
+
+`make reproduce` requires the live node at `DG_HYDRA_URL` and **refuses an in-process fallback**. It runs the synthetic HydraDB benchmark, replays the one-hop and Book controls, runs both poison scenarios and the vulnerability slice, evaluates H1–H16, and regenerates the `results/*.json` evaluation exports. It checks that the independent synthetic replay matches HydraDB and that every pre-registered check passes before replacing exports. It writes the benchmark summary through moto, then exports `results/summary.json`. The generated timestamp will change; accuracy numbers are deterministic for the committed data and defaults. The vulnerability benchmark uses committed `data/vuln/claims.jsonl`, so it does not require live NVD or OSV downloads. CI runs lint, pytest, and the frontend build without a HydraDB service; the path vote test uses a fake transport.
+
+### Architecture
 
 ```mermaid
 flowchart LR
-  subgraph vendors [Synthetic vendors]
-    W[Wikidata chain]
-    R[Registry chain]
-    S[Scraper chain]
-  end
-  W --> G[Entity gadgets in one graph]
-  R --> G
-  S --> G
-  G --> P[Weighted path search]
-  FB[Reviewer says who the owner was] --> L[Refit on the last 100 questions]
-  L --> C[Source costs and PolicyVersion]
-  C --> P
-  P --> A[Named owner]
-  A --> UI[Dashboard]
-  C --> B[(S3 bucket via moto)]
-  B --> UI
+  F[Vendor or feed claims] --> H[(HydraDB graph)]
+  R[Reviewer feedback] --> L[Windowed refit and shrinkage]
+  L --> G{PolicyVersion guard}
+  G -->|accept or roll back| C[Positive edge costs]
+  C --> H
+  H --> P[Weighted algo.SSpaths or algo.SPpaths]
+  P --> V[Owner or verdict vote]
+  V --> A[FastAPI and React]
+  S[(S3-compatible bucket)] --> H
+  L --> S
+  S --> A
 ```
 
-Each relation is three two-hop chains from one company to a person, with no cross edge and no shortcut stage. Search picks the minimum-cost path that ends on a person. A weighted call is the `algo.SSpaths` shape in `dreamgraph/hydra_client.py` (`weightProp: 'cost'`, `pathCount` and `resultLimit` set to the same total). This run used the in-process implementation of that choice.
+The synthetic ownership world has competing chains from one company to candidate people, with no cross edge or shortcut stage. The vulnerability world has one two-edge claim chain per feed and verdict. Reviewer feedback refits strictly positive source costs; vulnerability costs also shrink each feed×project estimate toward its feed cost. `PolicyVersion` records the guard score and any rollback. The learner stamps `cost` on graph edges; HydraDB's `weightProp: 'cost'` makes `algo.SSpaths` or `algo.SPpaths` minimize the sum. Live vulnerability queries call `algo.SPpaths` per verdict and vote returned paths. Synthetic held-out paths use `algo.SSpaths`. Every path call sets equal positive `pathCount` and `resultLimit` total caps and every request gets a new UUID `query_id`.
 
 At iteration 4, `seed.py --drift` swaps the `wikidata` and `scraper` labels on relations 15 and up. Endpoints stay put. Held-out ids start at 1000, so the whole held-out set swaps. The learner then sees the new labels only through the trailing window of 100 train questions. It never writes a gold edge cost of 0.
 
 HydraDB, when you run it, stores the graph in the bucket. The query node's disk is cache. Local disk is not the source of truth. See `docs/HYDRA_RUNBOOK.md`.
+
+### Results and ablations
+
+The tables above are copied from the JSON exports. On **1,317 held-out vulnerability tags per seed, across three seeds**, DreamGraph ends at **68.2% (95% CI 66.8–69.6)**; NVD-only is **64.9% (63.5–66.4)**. The same learner over plain dicts ties DreamGraph at 68.2%. Per-feed costs without project conditioning reach 63.3%; unrestricted top-five voting reaches 65.8%; the one-shot fit reaches 61.1%. Under poisoned training feedback, the guard keeps 65.1% (63.7–66.5), while the naive unguarded fit falls to 35.0% (33.3–36.4). The frozen-after-3 model ties the guarded model in that poison test. The synthetic ownership ablation gives 90.6% for HydraDB weighted search and the dict twin, 45.9% for a one-hop lookup, and 20.7% unweighted. [H1–H16 and their observed verdicts](#hypotheses) were declared in code before evaluation.
+
+### What broke
+
+- The Book dataset tied all baselines at **96.7%**. It did not distinguish learning or path search, so the vulnerability slice became the main real-data evaluation. Book results remain as an ablation in the exports.
+- A `cell-0` writer lease made seeding fail after a node restart. The seeding path now retries with backoff while the lease clears.
+- three.js r181 removed `Object3D.intersectsFrustum`, which crashed the 3D graph when a second Three copy was bundled. The graph includes a compatibility shim and the Vite build deduplicates Three.
+
+### Limits
+
+The vulnerability benchmark replays a cached slice rather than querying current feeds, and `nvd_mirror` is a modeled adversarial source. Its main evaluation uses an in-process graph; the live `algo.SPpaths` path is confirmed on a sample and exposed in the query API. The dict learner ties DreamGraph, so the evidence supports HydraDB as the weighted search engine, not an accuracy gain over an equivalent Python Dijkstra. The poison guard ties a frozen model, so it shows resistance to that attack, not learning through it. The synthetic vendor noise is generated, and the public app is a demonstration rather than a multi-tenant service.
 
 ## Run it locally
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import threading
 import time
@@ -12,10 +13,13 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field
 
 from dreamgraph.bench import EXPORT, percentile
 from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
 from dreamgraph.hydra_graph import HydraGraph, concurrent_latencies
+from dreamgraph.learner import CostBook
+from dreamgraph.mcp import mcp
 from dreamgraph.search import Prediction
 from dreamgraph.vuln_world import generate_vuln_world
 from dreamgraph.world import World, apply_drift, generate_world
@@ -70,12 +74,29 @@ def _seed_on_boot() -> None:
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    if os.environ.get("DG_SEED_ON_BOOT") == "1":
-        threading.Thread(target=_seed_on_boot, name="dreamgraph-seed", daemon=True).start()
-    yield
+    async with mcp.session_manager.run():
+        if os.environ.get("DG_SEED_ON_BOOT") == "1":
+            threading.Thread(target=_seed_on_boot, name="dreamgraph-seed", daemon=True).start()
+        yield
 
 
 app = FastAPI(title="DreamGraph", version="0.1.0", lifespan=_lifespan)
+
+
+class _MCPPrefix:
+    """Serve the mounted root route at /mcp without a trailing-slash redirect."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"] == "/mcp":
+            scope = {**scope, "path": "/mcp/", "raw_path": b"/mcp/"}
+        await self.inner(scope, receive, send)
+
+
+app.add_middleware(_MCPPrefix)
+app.mount("/mcp", mcp.streamable_http_app())
 
 
 def load_results() -> dict:
@@ -246,6 +267,92 @@ def _ensure_vuln_edge(world: World, rel: int) -> HydraGraph:
     return graph
 
 
+class VerdictRequest(BaseModel):
+    cve: str = Field(..., pattern=r"^CVE-\d{4}-\d{4,}$", max_length=32, examples=["CVE-2023-3745"])
+    package: str = Field(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._+/-]*$", examples=["ImageMagick"])
+    version: str = Field(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._+~:-]*$", examples=["7.0.11-1"])
+
+
+def _verdict(request: VerdictRequest) -> dict:
+    document = load_results()
+    world = vuln_world(document)
+    wanted = f"{request.package} {request.version} · {request.cve}".casefold()
+    rel = next((rel for rel, leaf in world.leaf.items() if world.names[leaf].casefold() == wanted), None)
+    if rel is None:
+        raise HTTPException(status_code=404, detail="Tag is not in the Zenodo graph")
+    if not _hydra_up():
+        raise HTTPException(status_code=503, detail="HydraDB is not answering on :8443")
+
+    demo = document["vuln"]["demo"]
+    policies = [row for row in document["vuln"]["policies"] if row["seed"] == demo["seed"] and row["costs"] == demo["costs"]]
+    if not policies:
+        raise HTTPException(status_code=503, detail="Published demo costs have no matching PolicyVersion")
+    policy = policies[-1]
+    pair = {}
+    for key, value in demo["conditional"].items():
+        feed, _, project = key.partition("|")
+        pair[(feed, project)] = float(value)
+    book = CostBook({feed: float(cost) for feed, cost in demo["costs"].items()}, pair)
+    project = world.projects[rel]
+    graph = _ensure_vuln_edge(world, rel)
+    feeds = {world.edges[index].source for chain in world.chains[rel] for index in chain.edge_indexes}
+    graph.stamp_source_costs({feed: book.weight(feed, project) for feed in feeds}, rel)
+    vote = demo["vote"]
+    prediction, found = graph.voted_paths(world, rel, k=int(vote["k"]), margin=float(vote["margin"]))
+    ranked = sorted(found, key=lambda item: (item[0], item[1]))[:int(vote["k"])]
+    eligible = [item for item in ranked if item[0] <= ranked[0][0] + float(vote["margin"]) + 1e-9] if ranked else []
+    scores = {}
+    for weight, end, *_ in eligible:
+        scores[end] = scores.get(end, 0.0) + math.exp(-weight)
+    confidence = round(scores.get(prediction.person, 0.0) / sum(scores.values()), 6) if scores else 0.0
+    paths = []
+    for weight, end, _nodes, sources in ranked:
+        feed = sources[0] if sources else "unknown"
+        paths.append({
+            "feed": feed,
+            "trust_cost": round(book.weight(feed, project), 6) if feed != "unknown" else None,
+            "path_cost": round(weight, 6),
+            "claim": world.names[end].replace(" ", "_"),
+            "in_vote": (weight, end, _nodes, sources) in eligible,
+        })
+    label = world.names.get(prediction.person, "unknown").replace(" ", "_")
+    return {
+        "cve": request.cve,
+        "package": request.package,
+        "version": request.version,
+        "verdict": label,
+        "confidence": confidence,
+        "confidence_note": "Share of exp(-path cost) votes within 0.15 of the cheapest top-5 path; not a calibrated probability.",
+        "trust_paths": paths,
+        "policy_version": policy["version"],
+        "gold_label": world.names[world.gold[rel]].replace(" ", "_"),
+        "procedure": "algo.SPpaths",
+    }
+
+
+@app.get("/api/verdict", summary="Check a vulnerability tag using live HydraDB weighted paths")
+def get_verdict(
+    cve: str = Query(..., pattern=r"^CVE-\d{4}-\d{4,}$", max_length=32),
+    package: str = Query(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._+/-]*$"),
+    version: str = Query(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._+~:-]*$"),
+) -> dict:
+    return _verdict(VerdictRequest(cve=cve, package=package, version=version))
+
+
+@app.post("/api/verdict", summary="Check one tag or a batch of up to 20")
+def post_verdict(request: VerdictRequest | list[VerdictRequest]) -> dict | list[dict]:
+    if isinstance(request, list):
+        if not request or len(request) > 20:
+            raise HTTPException(status_code=422, detail="Batch must contain 1–20 tags")
+        return [_verdict(item) for item in request]
+    return _verdict(request)
+
+
+@app.post("/api/verdict/batch", summary="Check up to 20 tags")
+def batch_verdict(requests: list[VerdictRequest]) -> list[dict]:
+    return post_verdict(requests)
+
+
 @app.get("/api/query")
 def query(
     rel: int = Query(..., description="Relation id from the benchmark demo list"),
@@ -345,9 +452,13 @@ def assets(asset_path: str):
     if asset_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="not found")
     candidate = (DIST / asset_path).resolve()
-    if not str(candidate).startswith(str(DIST.resolve())) or not candidate.is_file():
+    if not candidate.is_relative_to(DIST.resolve()):
+        raise HTTPException(status_code=404, detail="not found")
+    if not candidate.is_file():
         page = DIST / "index.html"
-        if page.exists():
+        if page.exists() and (asset_path == "dashboard" or asset_path.startswith("dashboard/") or asset_path == "graph" or asset_path.startswith("graph/")):
             return FileResponse(page)
+        if page.exists() and "." not in Path(asset_path).name:
+            return FileResponse(page, status_code=404)
         raise HTTPException(status_code=404, detail="not found")
     return FileResponse(candidate)

@@ -32,7 +32,7 @@ def test_guard_rolls_back_a_hostile_update(monkeypatch):
     real_refit = learner_mod.refit_costs
 
     def flipped(questions, world):
-        costs = real_refit(questions, world)
+        real_refit(questions, world)
         return {"wikidata": 9.0, "registry": 8.0, "scraper": 1.0}
 
     monkeypatch.setattr(learner_mod, "refit_costs", flipped)

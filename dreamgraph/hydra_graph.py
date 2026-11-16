@@ -150,6 +150,12 @@ class HydraGraph:
         edges, so each verdict is its own call with ``pathCount`` = ``k``.
         """
 
+        prediction, _paths = self.voted_paths(world, rel_id, k=k, margin=margin)
+        return prediction
+
+    def voted_paths(self, world: World, rel_id: int, *, k: int, margin: float | None):
+        """Return the live SPpaths vote and the rows used as its evidence."""
+
         from dreamgraph.search import combine_ends
 
         targets = sorted({chain.person for chain in world.chains.get(rel_id, [])})
@@ -174,9 +180,9 @@ class HydraGraph:
                 found.append((float(row[1]), nodes[-1], nodes, sources))
         chosen, _weight = combine_ends([(item[0], item[1]) for item in found], k=k, margin=margin)
         if chosen is None:
-            return Prediction(None, (world.leaf[rel_id],), (), float("inf"))
+            return Prediction(None, (world.leaf[rel_id],), (), float("inf")), found
         match = min((item for item in found if item[1] == chosen), key=lambda item: (item[0], item[2]))
-        return Prediction(match[1], match[2], match[3], match[0])
+        return Prediction(match[1], match[2], match[3], match[0]), found
 
 
 def concurrent_latencies(base_url: str, token: str, src: int, rounds: int = 40, clients: int = 20) -> list[float]:

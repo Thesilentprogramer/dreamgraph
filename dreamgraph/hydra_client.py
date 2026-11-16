@@ -12,7 +12,7 @@ import json
 import uuid
 import urllib.error
 import urllib.request
-from typing import Any, Callable, Protocol
+from typing import Any, Callable
 
 from dreamgraph.config import REL_TYPE, SOURCES
 
