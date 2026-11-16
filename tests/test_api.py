@@ -1,8 +1,13 @@
 from fastapi.testclient import TestClient
 
-from dreamgraph.api import app
+from dreamgraph.api import _writer_not_ready, app
 
 client = TestClient(app)
+
+
+def test_seed_retries_until_the_node_owns_the_cell():
+    assert _writer_not_ready(RuntimeError("cell cell-0 is not owned by this node; owner: unknown"))
+    assert not _writer_not_ready(RuntimeError("parse error"))
 
 
 def test_healthz_reports_the_engine():

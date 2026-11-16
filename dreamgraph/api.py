@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,26 +27,42 @@ _load_lock = threading.Lock()
 _boot = {"seeding": False, "seeded": False, "error": None}
 
 
+def _writer_not_ready(exc: BaseException) -> bool:
+    return "not owned by this node" in str(exc)
+
+
 def _seed_on_boot() -> None:
-    """Load the demo world into HydraDB after the process is listening."""
+    """Load the demo world once this node owns cell-0.
+
+    /healthz answers before the writer lease is claimed. On a slow CPU that
+    gap is long enough for the first MERGE to fail with owner: unknown.
+    """
 
     _boot["seeding"] = True
     _boot["error"] = None
+    deadline = time.monotonic() + 300
+    delay = 2.0
     try:
-        for _ in range(90):
-            if _hydra_up():
-                break
-            threading.Event().wait(1)
-        else:
-            _boot["error"] = "HydraDB did not open /healthz"
-            return
-        document = load_results()
-        world = demo_world(document)
-        graph = _ensure_loaded(world)
-        graph.stamp_source_costs(document["demo"]["costs"])
-        _boot["seeded"] = True
-    except Exception as exc:  # noqa: BLE001 — surfaced on /api/health
-        _boot["error"] = str(exc)
+        while True:
+            if not _hydra_up():
+                if time.monotonic() >= deadline:
+                    _boot["error"] = "HydraDB did not open /healthz"
+                    return
+            else:
+                try:
+                    document = load_results()
+                    world = demo_world(document)
+                    graph = _ensure_loaded(world)
+                    graph.stamp_source_costs(document["demo"]["costs"])
+                    _boot["seeded"] = True
+                    _boot["error"] = None
+                    return
+                except Exception as exc:  # noqa: BLE001 — surfaced on /api/health
+                    _boot["error"] = str(exc)
+                    if not _writer_not_ready(exc) or time.monotonic() >= deadline:
+                        return
+            threading.Event().wait(delay)
+            delay = min(delay * 1.5, 15.0)
     finally:
         _boot["seeding"] = False
 
