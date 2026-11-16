@@ -226,6 +226,16 @@ def results() -> dict:
     return load_results()
 
 
+@app.get("/api/explorer")
+def explorer() -> dict:
+    """Precomputed 3D graph. It does not refit costs or call the learner."""
+
+    path = ROOT / "results" / "explorer.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="results/explorer.json is missing.")
+    return json.loads(path.read_text())
+
+
 def _ensure_vuln_edge(world: World, rel: int) -> HydraGraph:
     graph = _graph()
     loaded = _world_cache.setdefault("vuln_rels", set())
