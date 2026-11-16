@@ -63,8 +63,16 @@ export GRAPH_ALLOW_PLAINTEXT=true
 export RUST_MIN_STACK=33554432
 export GRAPH_USAGE_REPORT_ENABLED=false
 export RUST_LOG="${RUST_LOG:-info}"
+export DG_STATE_DIR="${DG_STATE_DIR:-/var/lib/dreamgraph/state}"
+mkdir -p "$DG_STATE_DIR"
+
+# Optional. An empty DG_STATE_DIR (the free plan, no disk) restores nothing.
+python -m dreamgraph.moto_state restore || true
 
 /usr/local/bin/graph-node >/tmp/graph-node.log 2>&1 &
+
+# Best-effort copy of the bucket. A failed snapshot must not stop the app.
+( python -m dreamgraph.moto_state watch || true ) >/tmp/moto-state.log 2>&1 &
 
 python3 - << 'PY'
 import time

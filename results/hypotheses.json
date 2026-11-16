@@ -1,0 +1,76 @@
+{
+  "items": [
+    {
+      "dataset": "synthetic",
+      "evidence": "results/one_hop.json",
+      "id": "H1",
+      "observed": "replay gap 0.4467",
+      "statement": "On a memory replay of the synthetic ownership loop, iteration-8 DreamGraph accuracy exceeds the 1-hop first-edge ablation by at least 0.10.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "synthetic",
+      "evidence": "results/summary.json",
+      "id": "H2",
+      "observed": "hop3 gap 1.0000",
+      "statement": "On the published HydraDB run, DreamGraph's final 3-hop answer rate exceeds the unweighted walk by at least 0.50.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "synthetic",
+      "evidence": "results/summary.json",
+      "id": "H3",
+      "observed": "max abs diff 0.000000",
+      "statement": "The dict learner matches published DreamGraph accuracy on every iteration, absolute difference under 0.005.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "book",
+      "evidence": "results/public_summary.json",
+      "id": "H4",
+      "observed": "mean cost Revaluation 0.0410 vs textbooksNow 1.5446",
+      "statement": "On the Book seller slice, the mean final learned cost of Revaluation Books is strictly below the mean final learned cost of textbooksNow.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "book",
+      "evidence": "results/public_summary.json",
+      "id": "H5",
+      "observed": "max abs diff 0.000000",
+      "statement": "On the Book seller slice, the dict learner matches DreamGraph on every iteration, absolute difference under 0.005.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "book",
+      "evidence": "results/public_summary.json",
+      "id": "H6",
+      "observed": "final accuracy 0.9667",
+      "statement": "On the Book seller slice, DreamGraph's final held-out accuracy is at least 0.75.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "poison",
+      "evidence": "results/poison.json",
+      "id": "H7",
+      "observed": "rollbacks 15, dreamgraph minus naive 0.4467",
+      "statement": "In the poisoned-source scenario the guard rolls back at least 3 policy versions, and the naive no-guard learner finishes at least 0.10 below DreamGraph.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "poison",
+      "evidence": "results/poison.json",
+      "id": "H8",
+      "observed": "receipts 15 well-formed True",
+      "statement": "Every poison rollback receipt has reason 'guard accuracy fell', a lower guard accuracy after the proposal than before, and strictly positive costs.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "poison",
+      "evidence": "results/poison.json",
+      "id": "H9",
+      "observed": "absolute frozen gap 0.0000",
+      "statement": "A model frozen after iteration 3 finishes within 0.08 of DreamGraph on the poison run, because the poison starts at iteration 4. The guard's evidence is the receipt log, not a unique final score against that frozen model.",
+      "verdict": "PASS"
+    }
+  ]
+}

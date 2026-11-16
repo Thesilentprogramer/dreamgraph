@@ -1,0 +1,1238 @@
+{
+  "config": {
+    "batch": 40,
+    "bootstrap": 1000,
+    "guard": 20,
+    "held_out": 300,
+    "iterations": 8,
+    "protocol": "score then update; poison flag flips train feedback from the poison iteration onward; no label drift",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "window": 100
+  },
+  "methods": [
+    "dreamgraph",
+    "dict_learner",
+    "naive",
+    "greedy",
+    "unweighted",
+    "frozen_at_3",
+    "one_hop"
+  ],
+  "notes": [
+    "Naive fits the whole trailing window and always accepts.",
+    "Frozen-after-3 copies DreamGraph only while the poison flag is still off.",
+    "1-hop is scored with DreamGraph's guarded costs.",
+    "Receipts record guard accuracy and held-out accuracy before and after the proposal."
+  ],
+  "poison_false_friend": "scraper",
+  "poison_iter": 4,
+  "poison_source": "wikidata",
+  "policies": [
+    {
+      "costs": {
+        "registry": 0.826087,
+        "scraper": 3.666667,
+        "wikidata": 0.512195
+      },
+      "guard_accuracy": 0.9,
+      "guard_after": 0.9,
+      "guard_before": 0.5,
+      "heldout_after": 0.916667,
+      "heldout_before": 0.24,
+      "iteration": 1,
+      "proposed_costs": {
+        "registry": 0.826087,
+        "scraper": 3.666667,
+        "wikidata": 0.512195
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 0,
+      "version": 1,
+      "window": 40
+    },
+    {
+      "costs": {
+        "registry": 0.525,
+        "scraper": 1.904762,
+        "wikidata": 0.389313
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.85,
+      "guard_before": 0.85,
+      "heldout_after": 0.916667,
+      "heldout_before": 0.916667,
+      "iteration": 2,
+      "proposed_costs": {
+        "registry": 0.525,
+        "scraper": 1.904762,
+        "wikidata": 0.389313
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 0,
+      "version": 2,
+      "window": 80
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.95,
+      "guard_after": 0.95,
+      "guard_before": 0.95,
+      "heldout_after": 0.916667,
+      "heldout_before": 0.916667,
+      "iteration": 3,
+      "proposed_costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 0,
+      "version": 3,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.6,
+      "guard_after": 0.4,
+      "guard_before": 0.6,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 4,
+      "proposed_costs": {
+        "registry": 0.5,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 4,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.55,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 5,
+      "proposed_costs": {
+        "registry": 0.557692,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 5,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.4,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 6,
+      "proposed_costs": {
+        "registry": 0.542857,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 6,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.4,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 7,
+      "proposed_costs": {
+        "registry": 0.433628,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 7,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.4,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 8,
+      "proposed_costs": {
+        "registry": 0.459459,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 8,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.5,
+        "scraper": 1.625,
+        "wikidata": 0.55
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.8,
+      "guard_before": 0.3,
+      "heldout_after": 0.896667,
+      "heldout_before": 0.18,
+      "iteration": 1,
+      "proposed_costs": {
+        "registry": 0.5,
+        "scraper": 1.625,
+        "wikidata": 0.55
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 1,
+      "version": 9,
+      "window": 40
+    },
+    {
+      "costs": {
+        "registry": 0.544304,
+        "scraper": 1.904762,
+        "wikidata": 0.555556
+      },
+      "guard_accuracy": 0.7,
+      "guard_after": 0.7,
+      "guard_before": 0.7,
+      "heldout_after": 0.896667,
+      "heldout_before": 0.896667,
+      "iteration": 2,
+      "proposed_costs": {
+        "registry": 0.544304,
+        "scraper": 1.904762,
+        "wikidata": 0.555556
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 1,
+      "version": 10,
+      "window": 80
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.8,
+      "guard_before": 0.8,
+      "heldout_after": 0.896667,
+      "heldout_before": 0.896667,
+      "iteration": 3,
+      "proposed_costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 1,
+      "version": 11,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.7,
+      "guard_before": 0.8,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 4,
+      "proposed_costs": {
+        "registry": 0.408696,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 12,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.6,
+      "guard_before": 0.8,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 5,
+      "proposed_costs": {
+        "registry": 0.396552,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 13,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.95,
+      "guard_after": 0.55,
+      "guard_before": 0.95,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 6,
+      "proposed_costs": {
+        "registry": 0.459459,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 14,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.7,
+      "guard_after": 0.5,
+      "guard_before": 0.7,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 7,
+      "proposed_costs": {
+        "registry": 0.459459,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 15,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.95,
+      "guard_after": 0.45,
+      "guard_before": 0.95,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 8,
+      "proposed_costs": {
+        "registry": 0.514019,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 16,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.5,
+        "scraper": 1.625,
+        "wikidata": 1.0
+      },
+      "guard_accuracy": 0.55,
+      "guard_after": 0.55,
+      "guard_before": 0.25,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.2,
+      "iteration": 1,
+      "proposed_costs": {
+        "registry": 0.5,
+        "scraper": 1.625,
+        "wikidata": 1.0
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 2,
+      "version": 17,
+      "window": 40
+    },
+    {
+      "costs": {
+        "registry": 0.487805,
+        "scraper": 1.595745,
+        "wikidata": 0.654545
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.85,
+      "guard_before": 0.45,
+      "heldout_after": 0.903333,
+      "heldout_before": 0.476667,
+      "iteration": 2,
+      "proposed_costs": {
+        "registry": 0.487805,
+        "scraper": 1.595745,
+        "wikidata": 0.654545
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 2,
+      "version": 18,
+      "window": 80
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.8,
+      "guard_before": 0.8,
+      "heldout_after": 0.903333,
+      "heldout_before": 0.903333,
+      "iteration": 3,
+      "proposed_costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "reason": "accepted",
+      "rolled_back": false,
+      "seed": 2,
+      "version": 19,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.9,
+      "guard_after": 0.6,
+      "guard_before": 0.9,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 4,
+      "proposed_costs": {
+        "registry": 0.588235,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 20,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.95,
+      "guard_after": 0.5,
+      "guard_before": 0.95,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 5,
+      "proposed_costs": {
+        "registry": 0.472727,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 21,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.3,
+      "guard_before": 0.8,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 6,
+      "proposed_costs": {
+        "registry": 0.486239,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 22,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 1.0,
+      "guard_after": 0.45,
+      "guard_before": 1.0,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 7,
+      "proposed_costs": {
+        "registry": 0.557692,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 23,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.35,
+      "guard_before": 0.85,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 8,
+      "proposed_costs": {
+        "registry": 0.572816,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 24,
+      "window": 100
+    }
+  ],
+  "receipts": [
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.6,
+      "guard_after": 0.4,
+      "guard_before": 0.6,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 4,
+      "proposed_costs": {
+        "registry": 0.5,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 4,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.55,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 5,
+      "proposed_costs": {
+        "registry": 0.557692,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 5,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.4,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 6,
+      "proposed_costs": {
+        "registry": 0.542857,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 6,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.4,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 7,
+      "proposed_costs": {
+        "registry": 0.433628,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 7,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.472727,
+        "scraper": 1.892857,
+        "wikidata": 0.406977
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.4,
+      "guard_before": 0.85,
+      "heldout_after": 0.446667,
+      "heldout_before": 0.916667,
+      "iteration": 8,
+      "proposed_costs": {
+        "registry": 0.459459,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 0,
+      "version": 8,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.7,
+      "guard_before": 0.8,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 4,
+      "proposed_costs": {
+        "registry": 0.408696,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 12,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.6,
+      "guard_before": 0.8,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 5,
+      "proposed_costs": {
+        "registry": 0.396552,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 13,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.95,
+      "guard_after": 0.55,
+      "guard_before": 0.95,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 6,
+      "proposed_costs": {
+        "registry": 0.459459,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 14,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.7,
+      "guard_after": 0.5,
+      "guard_before": 0.7,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 7,
+      "proposed_costs": {
+        "registry": 0.459459,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 15,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.514019,
+        "scraper": 1.612903,
+        "wikidata": 0.602649
+      },
+      "guard_accuracy": 0.95,
+      "guard_after": 0.45,
+      "guard_before": 0.95,
+      "heldout_after": 0.453333,
+      "heldout_before": 0.896667,
+      "iteration": 8,
+      "proposed_costs": {
+        "registry": 0.514019,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 1,
+      "version": 16,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.9,
+      "guard_after": 0.6,
+      "guard_before": 0.9,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 4,
+      "proposed_costs": {
+        "registry": 0.588235,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 20,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.95,
+      "guard_after": 0.5,
+      "guard_before": 0.95,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 5,
+      "proposed_costs": {
+        "registry": 0.472727,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 21,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.8,
+      "guard_after": 0.3,
+      "guard_before": 0.8,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 6,
+      "proposed_costs": {
+        "registry": 0.486239,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 22,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 1.0,
+      "guard_after": 0.45,
+      "guard_before": 1.0,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 7,
+      "proposed_costs": {
+        "registry": 0.557692,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 23,
+      "window": 100
+    },
+    {
+      "costs": {
+        "registry": 0.572816,
+        "scraper": 1.571429,
+        "wikidata": 0.493827
+      },
+      "guard_accuracy": 0.85,
+      "guard_after": 0.35,
+      "guard_before": 0.85,
+      "heldout_after": 0.476667,
+      "heldout_before": 0.903333,
+      "iteration": 8,
+      "proposed_costs": {
+        "registry": 0.572816,
+        "scraper": 0.006211,
+        "wikidata": 241.0
+      },
+      "reason": "guard accuracy fell",
+      "rolled_back": true,
+      "seed": 2,
+      "version": 24,
+      "window": 100
+    }
+  ],
+  "rollback_count": 15,
+  "rollback_counts": {
+    "0": 5,
+    "1": 5,
+    "2": 5
+  },
+  "scenario": "From iteration 4 on, train feedback treats wikidata as always wrong and scraper as always right. Held-out edges and gold people do not change. A naive refit trusts the lie. The guard compares the proposal with the current policy on the last 20 questions of the window, scored against the true owner.",
+  "series": {
+    "dict_learner": {
+      "accuracy": [
+        0.206667,
+        0.763333,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556
+      ],
+      "ci_high": [
+        0.232222,
+        0.787778,
+        0.923333,
+        0.924444,
+        0.925556,
+        0.924444,
+        0.924444,
+        0.923333
+      ],
+      "ci_low": [
+        0.178889,
+        0.74,
+        0.887778,
+        0.885556,
+        0.886667,
+        0.885556,
+        0.885556,
+        0.887778
+      ],
+      "hop3_rate": [
+        0.0,
+        0.666667,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "dreamgraph": {
+      "accuracy": [
+        0.206667,
+        0.763333,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556
+      ],
+      "ci_high": [
+        0.232222,
+        0.785556,
+        0.925556,
+        0.923333,
+        0.923333,
+        0.924444,
+        0.924444,
+        0.924444
+      ],
+      "ci_low": [
+        0.181111,
+        0.74,
+        0.886667,
+        0.887778,
+        0.886667,
+        0.885556,
+        0.886667,
+        0.886667
+      ],
+      "hop3_rate": [
+        0.0,
+        0.666667,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "frozen_at_3": {
+      "accuracy": [
+        0.206667,
+        0.763333,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.905556
+      ],
+      "ci_high": [
+        0.235556,
+        0.786667,
+        0.925556,
+        0.923333,
+        0.924444,
+        0.924444,
+        0.923333,
+        0.923333
+      ],
+      "ci_low": [
+        0.18,
+        0.738889,
+        0.885556,
+        0.886667,
+        0.886667,
+        0.885556,
+        0.886667,
+        0.885556
+      ],
+      "hop3_rate": [
+        0.0,
+        0.666667,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "greedy": {
+      "accuracy": [
+        0.206667,
+        0.68,
+        0.905556,
+        0.757778,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889
+      ],
+      "ci_high": [
+        0.233333,
+        0.702222,
+        0.922222,
+        0.781111,
+        0.493333,
+        0.491111,
+        0.492222,
+        0.49
+      ],
+      "ci_low": [
+        0.181111,
+        0.656667,
+        0.884444,
+        0.733333,
+        0.427778,
+        0.426667,
+        0.425556,
+        0.426667
+      ],
+      "hop3_rate": [
+        0.0,
+        0.666667,
+        1.0,
+        0.666667,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "naive": {
+      "accuracy": [
+        0.206667,
+        0.905556,
+        0.905556,
+        0.905556,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889
+      ],
+      "ci_high": [
+        0.231111,
+        0.924444,
+        0.924444,
+        0.924444,
+        0.491111,
+        0.491111,
+        0.49,
+        0.491111
+      ],
+      "ci_low": [
+        0.181111,
+        0.885556,
+        0.885556,
+        0.886667,
+        0.43,
+        0.428889,
+        0.424444,
+        0.426667
+      ],
+      "hop3_rate": [
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "one_hop": {
+      "accuracy": [
+        0.905556,
+        0.615556,
+        0.615556,
+        0.757778,
+        0.757778,
+        0.757778,
+        0.757778,
+        0.757778
+      ],
+      "ci_high": [
+        0.923333,
+        0.644444,
+        0.644444,
+        0.782222,
+        0.781111,
+        0.782222,
+        0.783333,
+        0.782222
+      ],
+      "ci_low": [
+        0.884444,
+        0.587778,
+        0.586667,
+        0.733333,
+        0.733333,
+        0.731111,
+        0.732222,
+        0.733333
+      ],
+      "hop3_rate": [
+        1.0,
+        0.333333,
+        0.333333,
+        0.666667,
+        0.666667,
+        0.666667,
+        0.666667,
+        0.666667
+      ]
+    },
+    "unweighted": {
+      "accuracy": [
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667,
+        0.206667
+      ],
+      "ci_high": [
+        0.233333,
+        0.232222,
+        0.233333,
+        0.232222,
+        0.233333,
+        0.231111,
+        0.232222,
+        0.232222
+      ],
+      "ci_low": [
+        0.181111,
+        0.178889,
+        0.18,
+        0.18,
+        0.181111,
+        0.18,
+        0.178889,
+        0.178889
+      ],
+      "hop3_rate": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  }
+}

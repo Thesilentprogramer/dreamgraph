@@ -1,4 +1,29 @@
 {
+  "ablations": {
+    "book": {
+      "bm25": 0.788889,
+      "dict_learner": 0.966667,
+      "dreamgraph": 0.966667,
+      "frozen_at_3": 0.966667,
+      "greedy": 0.966667,
+      "hand_set": 0.966667,
+      "one_hop": 0.966667,
+      "one_shot": 0.966667,
+      "unweighted": 0.966667
+    },
+    "note": "1-hop lookup ranks chains by the learned cost of the first edge and does not call algo.SSpaths. Unweighted search counts hops. DreamGraph sums learned edge costs; the published synthetic run did that sum inside HydraDB. The dict learner sums the same costs outside the engine, which is why its accuracies match.",
+    "synthetic": {
+      "dict_learner": 0.905556,
+      "dreamgraph": 0.905556,
+      "dreamgraph_hop3": 1.0,
+      "one_hop": 0.458889,
+      "one_hop_hop3": 0.0,
+      "replay_dreamgraph": 0.905556,
+      "replay_matches_published": true,
+      "unweighted": 0.206667,
+      "unweighted_hop3": 0.0
+    }
+  },
   "backend": "hydradb",
   "config": {
     "batch": 40,
@@ -52,6 +77,7 @@
     "seed": 0
   },
   "drift_iter": 4,
+  "evidence_generated_at": "2026-11-16T03:44:35.762271+00:00",
   "export_path": "results/summary.json",
   "final_costs_by_seed": [
     {
@@ -96,6 +122,80 @@
   ],
   "generated_at": "2026-11-15T20:01:55.270883+00:00",
   "hydra_verified": true,
+  "hypotheses": [
+    {
+      "dataset": "synthetic",
+      "evidence": "results/one_hop.json",
+      "id": "H1",
+      "observed": "replay gap 0.4467",
+      "statement": "On a memory replay of the synthetic ownership loop, iteration-8 DreamGraph accuracy exceeds the 1-hop first-edge ablation by at least 0.10.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "synthetic",
+      "evidence": "results/summary.json",
+      "id": "H2",
+      "observed": "hop3 gap 1.0000",
+      "statement": "On the published HydraDB run, DreamGraph's final 3-hop answer rate exceeds the unweighted walk by at least 0.50.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "synthetic",
+      "evidence": "results/summary.json",
+      "id": "H3",
+      "observed": "max abs diff 0.000000",
+      "statement": "The dict learner matches published DreamGraph accuracy on every iteration, absolute difference under 0.005.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "book",
+      "evidence": "results/public_summary.json",
+      "id": "H4",
+      "observed": "mean cost Revaluation 0.0410 vs textbooksNow 1.5446",
+      "statement": "On the Book seller slice, the mean final learned cost of Revaluation Books is strictly below the mean final learned cost of textbooksNow.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "book",
+      "evidence": "results/public_summary.json",
+      "id": "H5",
+      "observed": "max abs diff 0.000000",
+      "statement": "On the Book seller slice, the dict learner matches DreamGraph on every iteration, absolute difference under 0.005.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "book",
+      "evidence": "results/public_summary.json",
+      "id": "H6",
+      "observed": "final accuracy 0.9667",
+      "statement": "On the Book seller slice, DreamGraph's final held-out accuracy is at least 0.75.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "poison",
+      "evidence": "results/poison.json",
+      "id": "H7",
+      "observed": "rollbacks 15, dreamgraph minus naive 0.4467",
+      "statement": "In the poisoned-source scenario the guard rolls back at least 3 policy versions, and the naive no-guard learner finishes at least 0.10 below DreamGraph.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "poison",
+      "evidence": "results/poison.json",
+      "id": "H8",
+      "observed": "receipts 15 well-formed True",
+      "statement": "Every poison rollback receipt has reason 'guard accuracy fell', a lower guard accuracy after the proposal than before, and strictly positive costs.",
+      "verdict": "PASS"
+    },
+    {
+      "dataset": "poison",
+      "evidence": "results/poison.json",
+      "id": "H9",
+      "observed": "absolute frozen gap 0.0000",
+      "statement": "A model frozen after iteration 3 finishes within 0.08 of DreamGraph on the poison run, because the poison starts at iteration 4. The guard's evidence is the receipt log, not a unique final score against that frozen model.",
+      "verdict": "PASS"
+    }
+  ],
   "load": {
     "backend": "hydradb",
     "clients": 20,
@@ -134,6 +234,1244 @@
     "precomputed=true means the file is an export of the object written during this run."
   ],
   "object_key": "results/summary.json",
+  "poison": {
+    "config": {
+      "batch": 40,
+      "bootstrap": 1000,
+      "guard": 20,
+      "held_out": 300,
+      "iterations": 8,
+      "protocol": "score then update; poison flag flips train feedback from the poison iteration onward; no label drift",
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "window": 100
+    },
+    "methods": [
+      "dreamgraph",
+      "dict_learner",
+      "naive",
+      "greedy",
+      "unweighted",
+      "frozen_at_3",
+      "one_hop"
+    ],
+    "notes": [
+      "Naive fits the whole trailing window and always accepts.",
+      "Frozen-after-3 copies DreamGraph only while the poison flag is still off.",
+      "1-hop is scored with DreamGraph's guarded costs.",
+      "Receipts record guard accuracy and held-out accuracy before and after the proposal."
+    ],
+    "poison_false_friend": "scraper",
+    "poison_iter": 4,
+    "poison_source": "wikidata",
+    "policies": [
+      {
+        "costs": {
+          "registry": 0.826087,
+          "scraper": 3.666667,
+          "wikidata": 0.512195
+        },
+        "guard_accuracy": 0.9,
+        "guard_after": 0.9,
+        "guard_before": 0.5,
+        "heldout_after": 0.916667,
+        "heldout_before": 0.24,
+        "iteration": 1,
+        "proposed_costs": {
+          "registry": 0.826087,
+          "scraper": 3.666667,
+          "wikidata": 0.512195
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 1,
+        "window": 40
+      },
+      {
+        "costs": {
+          "registry": 0.525,
+          "scraper": 1.904762,
+          "wikidata": 0.389313
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.85,
+        "guard_before": 0.85,
+        "heldout_after": 0.916667,
+        "heldout_before": 0.916667,
+        "iteration": 2,
+        "proposed_costs": {
+          "registry": 0.525,
+          "scraper": 1.904762,
+          "wikidata": 0.389313
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 2,
+        "window": 80
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.916667,
+        "heldout_before": 0.916667,
+        "iteration": 3,
+        "proposed_costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 3,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.4,
+        "guard_before": 0.6,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 4,
+        "proposed_costs": {
+          "registry": 0.5,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 4,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.55,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 5,
+        "proposed_costs": {
+          "registry": 0.557692,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 5,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.4,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 6,
+        "proposed_costs": {
+          "registry": 0.542857,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 6,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.4,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 7,
+        "proposed_costs": {
+          "registry": 0.433628,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 7,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.4,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 8,
+        "proposed_costs": {
+          "registry": 0.459459,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 8,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.5,
+          "scraper": 1.625,
+          "wikidata": 0.55
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.8,
+        "guard_before": 0.3,
+        "heldout_after": 0.896667,
+        "heldout_before": 0.18,
+        "iteration": 1,
+        "proposed_costs": {
+          "registry": 0.5,
+          "scraper": 1.625,
+          "wikidata": 0.55
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 9,
+        "window": 40
+      },
+      {
+        "costs": {
+          "registry": 0.544304,
+          "scraper": 1.904762,
+          "wikidata": 0.555556
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.7,
+        "guard_before": 0.7,
+        "heldout_after": 0.896667,
+        "heldout_before": 0.896667,
+        "iteration": 2,
+        "proposed_costs": {
+          "registry": 0.544304,
+          "scraper": 1.904762,
+          "wikidata": 0.555556
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 10,
+        "window": 80
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.8,
+        "guard_before": 0.8,
+        "heldout_after": 0.896667,
+        "heldout_before": 0.896667,
+        "iteration": 3,
+        "proposed_costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 11,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.7,
+        "guard_before": 0.8,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 4,
+        "proposed_costs": {
+          "registry": 0.408696,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 12,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.6,
+        "guard_before": 0.8,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 5,
+        "proposed_costs": {
+          "registry": 0.396552,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 13,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.55,
+        "guard_before": 0.95,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 6,
+        "proposed_costs": {
+          "registry": 0.459459,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 14,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.5,
+        "guard_before": 0.7,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 7,
+        "proposed_costs": {
+          "registry": 0.459459,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 15,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.45,
+        "guard_before": 0.95,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 8,
+        "proposed_costs": {
+          "registry": 0.514019,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 16,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.5,
+          "scraper": 1.625,
+          "wikidata": 1.0
+        },
+        "guard_accuracy": 0.55,
+        "guard_after": 0.55,
+        "guard_before": 0.25,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.2,
+        "iteration": 1,
+        "proposed_costs": {
+          "registry": 0.5,
+          "scraper": 1.625,
+          "wikidata": 1.0
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 17,
+        "window": 40
+      },
+      {
+        "costs": {
+          "registry": 0.487805,
+          "scraper": 1.595745,
+          "wikidata": 0.654545
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.85,
+        "guard_before": 0.45,
+        "heldout_after": 0.903333,
+        "heldout_before": 0.476667,
+        "iteration": 2,
+        "proposed_costs": {
+          "registry": 0.487805,
+          "scraper": 1.595745,
+          "wikidata": 0.654545
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 18,
+        "window": 80
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.8,
+        "guard_before": 0.8,
+        "heldout_after": 0.903333,
+        "heldout_before": 0.903333,
+        "iteration": 3,
+        "proposed_costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 19,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.9,
+        "guard_after": 0.6,
+        "guard_before": 0.9,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 4,
+        "proposed_costs": {
+          "registry": 0.588235,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 20,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.5,
+        "guard_before": 0.95,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 5,
+        "proposed_costs": {
+          "registry": 0.472727,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 21,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.3,
+        "guard_before": 0.8,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 6,
+        "proposed_costs": {
+          "registry": 0.486239,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 22,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 0.45,
+        "guard_before": 1.0,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 7,
+        "proposed_costs": {
+          "registry": 0.557692,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 23,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.35,
+        "guard_before": 0.85,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 8,
+        "proposed_costs": {
+          "registry": 0.572816,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 24,
+        "window": 100
+      }
+    ],
+    "receipts": [
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.6,
+        "guard_after": 0.4,
+        "guard_before": 0.6,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 4,
+        "proposed_costs": {
+          "registry": 0.5,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 4,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.55,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 5,
+        "proposed_costs": {
+          "registry": 0.557692,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 5,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.4,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 6,
+        "proposed_costs": {
+          "registry": 0.542857,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 6,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.4,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 7,
+        "proposed_costs": {
+          "registry": 0.433628,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 7,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.472727,
+          "scraper": 1.892857,
+          "wikidata": 0.406977
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.4,
+        "guard_before": 0.85,
+        "heldout_after": 0.446667,
+        "heldout_before": 0.916667,
+        "iteration": 8,
+        "proposed_costs": {
+          "registry": 0.459459,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 0,
+        "version": 8,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.7,
+        "guard_before": 0.8,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 4,
+        "proposed_costs": {
+          "registry": 0.408696,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 12,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.6,
+        "guard_before": 0.8,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 5,
+        "proposed_costs": {
+          "registry": 0.396552,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 13,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.55,
+        "guard_before": 0.95,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 6,
+        "proposed_costs": {
+          "registry": 0.459459,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 14,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.7,
+        "guard_after": 0.5,
+        "guard_before": 0.7,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 7,
+        "proposed_costs": {
+          "registry": 0.459459,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 15,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.514019,
+          "scraper": 1.612903,
+          "wikidata": 0.602649
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.45,
+        "guard_before": 0.95,
+        "heldout_after": 0.453333,
+        "heldout_before": 0.896667,
+        "iteration": 8,
+        "proposed_costs": {
+          "registry": 0.514019,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 1,
+        "version": 16,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.9,
+        "guard_after": 0.6,
+        "guard_before": 0.9,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 4,
+        "proposed_costs": {
+          "registry": 0.588235,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 20,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.5,
+        "guard_before": 0.95,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 5,
+        "proposed_costs": {
+          "registry": 0.472727,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 21,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.8,
+        "guard_after": 0.3,
+        "guard_before": 0.8,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 6,
+        "proposed_costs": {
+          "registry": 0.486239,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 22,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 0.45,
+        "guard_before": 1.0,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 7,
+        "proposed_costs": {
+          "registry": 0.557692,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 23,
+        "window": 100
+      },
+      {
+        "costs": {
+          "registry": 0.572816,
+          "scraper": 1.571429,
+          "wikidata": 0.493827
+        },
+        "guard_accuracy": 0.85,
+        "guard_after": 0.35,
+        "guard_before": 0.85,
+        "heldout_after": 0.476667,
+        "heldout_before": 0.903333,
+        "iteration": 8,
+        "proposed_costs": {
+          "registry": 0.572816,
+          "scraper": 0.006211,
+          "wikidata": 241.0
+        },
+        "reason": "guard accuracy fell",
+        "rolled_back": true,
+        "seed": 2,
+        "version": 24,
+        "window": 100
+      }
+    ],
+    "rollback_count": 15,
+    "rollback_counts": {
+      "0": 5,
+      "1": 5,
+      "2": 5
+    },
+    "scenario": "From iteration 4 on, train feedback treats wikidata as always wrong and scraper as always right. Held-out edges and gold people do not change. A naive refit trusts the lie. The guard compares the proposal with the current policy on the last 20 questions of the window, scored against the true owner.",
+    "series": {
+      "dict_learner": {
+        "accuracy": [
+          0.206667,
+          0.763333,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556
+        ],
+        "ci_high": [
+          0.232222,
+          0.787778,
+          0.923333,
+          0.924444,
+          0.925556,
+          0.924444,
+          0.924444,
+          0.923333
+        ],
+        "ci_low": [
+          0.178889,
+          0.74,
+          0.887778,
+          0.885556,
+          0.886667,
+          0.885556,
+          0.885556,
+          0.887778
+        ],
+        "hop3_rate": [
+          0.0,
+          0.666667,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "dreamgraph": {
+        "accuracy": [
+          0.206667,
+          0.763333,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556
+        ],
+        "ci_high": [
+          0.232222,
+          0.785556,
+          0.925556,
+          0.923333,
+          0.923333,
+          0.924444,
+          0.924444,
+          0.924444
+        ],
+        "ci_low": [
+          0.181111,
+          0.74,
+          0.886667,
+          0.887778,
+          0.886667,
+          0.885556,
+          0.886667,
+          0.886667
+        ],
+        "hop3_rate": [
+          0.0,
+          0.666667,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "frozen_at_3": {
+        "accuracy": [
+          0.206667,
+          0.763333,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.905556
+        ],
+        "ci_high": [
+          0.235556,
+          0.786667,
+          0.925556,
+          0.923333,
+          0.924444,
+          0.924444,
+          0.923333,
+          0.923333
+        ],
+        "ci_low": [
+          0.18,
+          0.738889,
+          0.885556,
+          0.886667,
+          0.886667,
+          0.885556,
+          0.886667,
+          0.885556
+        ],
+        "hop3_rate": [
+          0.0,
+          0.666667,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "greedy": {
+        "accuracy": [
+          0.206667,
+          0.68,
+          0.905556,
+          0.757778,
+          0.458889,
+          0.458889,
+          0.458889,
+          0.458889
+        ],
+        "ci_high": [
+          0.233333,
+          0.702222,
+          0.922222,
+          0.781111,
+          0.493333,
+          0.491111,
+          0.492222,
+          0.49
+        ],
+        "ci_low": [
+          0.181111,
+          0.656667,
+          0.884444,
+          0.733333,
+          0.427778,
+          0.426667,
+          0.425556,
+          0.426667
+        ],
+        "hop3_rate": [
+          0.0,
+          0.666667,
+          1.0,
+          0.666667,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "naive": {
+        "accuracy": [
+          0.206667,
+          0.905556,
+          0.905556,
+          0.905556,
+          0.458889,
+          0.458889,
+          0.458889,
+          0.458889
+        ],
+        "ci_high": [
+          0.231111,
+          0.924444,
+          0.924444,
+          0.924444,
+          0.491111,
+          0.491111,
+          0.49,
+          0.491111
+        ],
+        "ci_low": [
+          0.181111,
+          0.885556,
+          0.885556,
+          0.886667,
+          0.43,
+          0.428889,
+          0.424444,
+          0.426667
+        ],
+        "hop3_rate": [
+          0.0,
+          1.0,
+          1.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "one_hop": {
+        "accuracy": [
+          0.905556,
+          0.615556,
+          0.615556,
+          0.757778,
+          0.757778,
+          0.757778,
+          0.757778,
+          0.757778
+        ],
+        "ci_high": [
+          0.923333,
+          0.644444,
+          0.644444,
+          0.782222,
+          0.781111,
+          0.782222,
+          0.783333,
+          0.782222
+        ],
+        "ci_low": [
+          0.884444,
+          0.587778,
+          0.586667,
+          0.733333,
+          0.733333,
+          0.731111,
+          0.732222,
+          0.733333
+        ],
+        "hop3_rate": [
+          1.0,
+          0.333333,
+          0.333333,
+          0.666667,
+          0.666667,
+          0.666667,
+          0.666667,
+          0.666667
+        ]
+      },
+      "unweighted": {
+        "accuracy": [
+          0.206667,
+          0.206667,
+          0.206667,
+          0.206667,
+          0.206667,
+          0.206667,
+          0.206667,
+          0.206667
+        ],
+        "ci_high": [
+          0.233333,
+          0.232222,
+          0.233333,
+          0.232222,
+          0.233333,
+          0.231111,
+          0.232222,
+          0.232222
+        ],
+        "ci_low": [
+          0.181111,
+          0.178889,
+          0.18,
+          0.18,
+          0.181111,
+          0.18,
+          0.178889,
+          0.178889
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    }
+  },
   "policies": [
     {
       "costs": {
@@ -474,6 +1812,1072 @@
   ],
   "precomputed": true,
   "project": "dreamgraph",
+  "public": {
+    "citation": "Yin, Han, and Yu, TKDE 2008, claims; Dong, Berti-Equille, and Srivastava, VLDB 2009, gold author lists from book covers. Cached slice: data/book/claims.jsonl.",
+    "config": {
+      "batch": 40,
+      "bootstrap": 1000,
+      "guard": 20,
+      "hand_set": {
+        "Revaluation Books": 1.0,
+        "The Book Depository": 2.0,
+        "textbooksNow": 6.0
+      },
+      "hand_set_rule": "fixed volume prior, not gold accuracy",
+      "held_out": 30,
+      "iterations": 8,
+      "protocol": "score then update; no label drift; same window and guard as the synthetic loop",
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "train_books": 25,
+      "window": 100
+    },
+    "dataset": "book",
+    "demo": {
+      "agree": [
+        5025,
+        5026,
+        5027,
+        5028,
+        5029,
+        5030,
+        5031,
+        5032
+      ],
+      "costs": {
+        "Revaluation Books": 0.031847,
+        "The Book Depository": 0.731343,
+        "textbooksNow": 1.137931
+      },
+      "disagree": [],
+      "questions": [
+        5025,
+        5026,
+        5027,
+        5028,
+        5029,
+        5030,
+        5031,
+        5032
+      ],
+      "seed": 0
+    },
+    "encoding": "Each seller is a 2-edge chain book \u2192 listing \u2192 author. Both edges carry that seller's learned cost. Path length does not depend on correctness. Unweighted search tie-breaks on node ids, and listing ids follow alphabetical seller order, so Revaluation Books wins ties when it listed the book.",
+    "final_costs_by_seed": [
+      {
+        "dreamgraph": {
+          "Revaluation Books": 0.018868,
+          "The Book Depository": 0.652174,
+          "textbooksNow": 1.129032
+        },
+        "seed": 0
+      },
+      {
+        "dreamgraph": {
+          "Revaluation Books": 0.045161,
+          "The Book Depository": 1.195122,
+          "textbooksNow": 2.904762
+        },
+        "seed": 1
+      },
+      {
+        "dreamgraph": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 0.670886,
+          "textbooksNow": 0.6
+        },
+        "seed": 2
+      }
+    ],
+    "license_note": "Research distribution at https://lunadong.com/fusionDataSets.htm. See data/book/PROVENANCE.md.",
+    "match_rule": "token Jaccard >= 0.5 on tokens longer than 2 characters, excluding 'and' and 'the'",
+    "methods": [
+      "dreamgraph",
+      "unweighted",
+      "hand_set",
+      "one_shot",
+      "dict_learner",
+      "greedy",
+      "bm25",
+      "frozen_at_3",
+      "one_hop"
+    ],
+    "notes": [
+      "1-hop lookup uses DreamGraph's learned costs and only the first edge. On this encoding both edges of a chain share a seller, so the sum ranks sellers the same way.",
+      "The dict learner minimizes that same sum outside HydraDB.",
+      "Seller accuracies on the full slice are descriptive. They are not written onto edges."
+    ],
+    "policies": [
+      {
+        "costs": {
+          "Revaluation Books": 0.076923,
+          "The Book Depository": 0.789474,
+          "textbooksNow": 0.714286
+        },
+        "guard_accuracy": 0.9,
+        "guard_after": 0.9,
+        "guard_before": 0.9,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 1,
+        "proposed_costs": {
+          "Revaluation Books": 0.076923,
+          "The Book Depository": 0.789474,
+          "textbooksNow": 0.714286
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 1,
+        "window": 40
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.06087,
+          "The Book Depository": 0.622642,
+          "textbooksNow": 1.086957
+        },
+        "guard_accuracy": 0.9,
+        "guard_after": 0.9,
+        "guard_before": 0.9,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 2,
+        "proposed_costs": {
+          "Revaluation Books": 0.06087,
+          "The Book Depository": 0.622642,
+          "textbooksNow": 1.086957
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 2,
+        "window": 80
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.072848,
+          "The Book Depository": 0.710145,
+          "textbooksNow": 1.344828
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 3,
+        "proposed_costs": {
+          "Revaluation Books": 0.072848,
+          "The Book Depository": 0.710145,
+          "textbooksNow": 1.344828
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 3,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 0.815385,
+          "textbooksNow": 0.828571
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 4,
+        "proposed_costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 0.815385,
+          "textbooksNow": 0.828571
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 4,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.031847,
+          "The Book Depository": 0.704918,
+          "textbooksNow": 0.581395
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 5,
+        "proposed_costs": {
+          "Revaluation Books": 0.031847,
+          "The Book Depository": 0.704918,
+          "textbooksNow": 0.581395
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 5,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.045161,
+          "The Book Depository": 0.723077,
+          "textbooksNow": 0.828571
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 6,
+        "proposed_costs": {
+          "Revaluation Books": 0.045161,
+          "The Book Depository": 0.723077,
+          "textbooksNow": 0.828571
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 6,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.031847,
+          "The Book Depository": 0.731343,
+          "textbooksNow": 1.137931
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 7,
+        "proposed_costs": {
+          "Revaluation Books": 0.031847,
+          "The Book Depository": 0.731343,
+          "textbooksNow": 1.137931
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 7,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.018868,
+          "The Book Depository": 0.652174,
+          "textbooksNow": 1.129032
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 8,
+        "proposed_costs": {
+          "Revaluation Books": 0.018868,
+          "The Book Depository": 0.652174,
+          "textbooksNow": 1.129032
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 0,
+        "version": 8,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.076923,
+          "The Book Depository": 1.181818,
+          "textbooksNow": 5.666667
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 1,
+        "proposed_costs": {
+          "Revaluation Books": 0.076923,
+          "The Book Depository": 1.181818,
+          "textbooksNow": 5.666667
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 9,
+        "window": 40
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.042735,
+          "The Book Depository": 1.322581,
+          "textbooksNow": 2.866667
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 2,
+        "proposed_costs": {
+          "Revaluation Books": 0.042735,
+          "The Book Depository": 1.322581,
+          "textbooksNow": 2.866667
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 10,
+        "window": 80
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.018868,
+          "The Book Depository": 1.25641,
+          "textbooksNow": 2.826087
+        },
+        "guard_accuracy": 0.9,
+        "guard_after": 0.9,
+        "guard_before": 0.9,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 3,
+        "proposed_costs": {
+          "Revaluation Books": 0.018868,
+          "The Book Depository": 1.25641,
+          "textbooksNow": 2.826087
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 11,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 1.228571,
+          "textbooksNow": 1.909091
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 4,
+        "proposed_costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 1.228571,
+          "textbooksNow": 1.909091
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 12,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.072848,
+          "The Book Depository": 1.228571,
+          "textbooksNow": 1.967742
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 5,
+        "proposed_costs": {
+          "Revaluation Books": 0.072848,
+          "The Book Depository": 1.228571,
+          "textbooksNow": 1.967742
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 13,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.045161,
+          "The Book Depository": 1.153846,
+          "textbooksNow": 2.652174
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 6,
+        "proposed_costs": {
+          "Revaluation Books": 0.045161,
+          "The Book Depository": 1.153846,
+          "textbooksNow": 2.652174
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 14,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 1.195122,
+          "textbooksNow": 2.565217
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 7,
+        "proposed_costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 1.195122,
+          "textbooksNow": 2.565217
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 15,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.045161,
+          "The Book Depository": 1.195122,
+          "textbooksNow": 2.904762
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 8,
+        "proposed_costs": {
+          "Revaluation Books": 0.045161,
+          "The Book Depository": 1.195122,
+          "textbooksNow": 2.904762
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 1,
+        "version": 16,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.272727,
+          "The Book Depository": 0.481481,
+          "textbooksNow": 3.666667
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 1,
+        "proposed_costs": {
+          "Revaluation Books": 0.272727,
+          "The Book Depository": 0.481481,
+          "textbooksNow": 3.666667
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 17,
+        "window": 40
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.161905,
+          "The Book Depository": 0.661017,
+          "textbooksNow": 3.181818
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 2,
+        "proposed_costs": {
+          "Revaluation Books": 0.161905,
+          "The Book Depository": 0.661017,
+          "textbooksNow": 3.181818
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 18,
+        "window": 80
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.102041,
+          "The Book Depository": 0.636364,
+          "textbooksNow": 2.866667
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 3,
+        "proposed_costs": {
+          "Revaluation Books": 0.102041,
+          "The Book Depository": 0.636364,
+          "textbooksNow": 2.866667
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 19,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.117241,
+          "The Book Depository": 0.52809,
+          "textbooksNow": 1.526316
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 4,
+        "proposed_costs": {
+          "Revaluation Books": 0.117241,
+          "The Book Depository": 0.52809,
+          "textbooksNow": 1.526316
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 20,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.072848,
+          "The Book Depository": 0.74026,
+          "textbooksNow": 1.0
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 5,
+        "proposed_costs": {
+          "Revaluation Books": 0.072848,
+          "The Book Depository": 0.74026,
+          "textbooksNow": 1.0
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 21,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.006211,
+          "The Book Depository": 0.714286,
+          "textbooksNow": 1.137931
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 6,
+        "proposed_costs": {
+          "Revaluation Books": 0.006211,
+          "The Book Depository": 0.714286,
+          "textbooksNow": 1.137931
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 22,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.018868,
+          "The Book Depository": 0.679012,
+          "textbooksNow": 1.0
+        },
+        "guard_accuracy": 1.0,
+        "guard_after": 1.0,
+        "guard_before": 1.0,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 7,
+        "proposed_costs": {
+          "Revaluation Books": 0.018868,
+          "The Book Depository": 0.679012,
+          "textbooksNow": 1.0
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 23,
+        "window": 100
+      },
+      {
+        "costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 0.670886,
+          "textbooksNow": 0.6
+        },
+        "guard_accuracy": 0.95,
+        "guard_after": 0.95,
+        "guard_before": 0.95,
+        "heldout_after": 0.966667,
+        "heldout_before": 0.966667,
+        "iteration": 8,
+        "proposed_costs": {
+          "Revaluation Books": 0.058824,
+          "The Book Depository": 0.670886,
+          "textbooksNow": 0.6
+        },
+        "reason": "accepted",
+        "rolled_back": false,
+        "seed": 2,
+        "version": 24,
+        "window": 100
+      }
+    ],
+    "rollback_counts": {
+      "0": 0,
+      "1": 0,
+      "2": 0
+    },
+    "seller_heldout_mean": {
+      "Revaluation Books": 0.966667,
+      "The Book Depository": 0.689044,
+      "textbooksNow": 0.39899
+    },
+    "series": {
+      "bm25": {
+        "accuracy": [
+          0.788889,
+          0.788889,
+          0.788889,
+          0.788889,
+          0.788889,
+          0.788889,
+          0.788889,
+          0.788889
+        ],
+        "ci_high": [
+          0.866667,
+          0.866667,
+          0.866667,
+          0.877778,
+          0.866667,
+          0.866667,
+          0.866667,
+          0.866667
+        ],
+        "ci_low": [
+          0.7,
+          0.7,
+          0.711111,
+          0.7,
+          0.711111,
+          0.7,
+          0.711111,
+          0.711111
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "dict_learner": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.922222,
+          0.922222,
+          0.933333,
+          0.933333,
+          0.922222,
+          0.933333,
+          0.922222
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "dreamgraph": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "frozen_at_3": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.933333
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "greedy": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.922222,
+          0.922222,
+          0.933333,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "hand_set": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.933333,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "one_hop": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "one_shot": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "unweighted": {
+        "accuracy": [
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667,
+          0.966667
+        ],
+        "ci_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ci_low": [
+          0.922222,
+          0.922222,
+          0.933333,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222,
+          0.922222
+        ],
+        "hop3_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "slice_books": 55,
+    "source_accuracy_on_slice": {
+      "Revaluation Books": {
+        "accuracy": 0.963636,
+        "hits": 53,
+        "n": 55
+      },
+      "The Book Depository": {
+        "accuracy": 0.625,
+        "hits": 25,
+        "n": 40
+      },
+      "textbooksNow": {
+        "accuracy": 0.380952,
+        "hits": 8,
+        "n": 21
+      }
+    },
+    "sources": [
+      "Revaluation Books",
+      "The Book Depository",
+      "textbooksNow"
+    ]
+  },
   "rollback_counts": {
     "0": 0,
     "1": 0,
@@ -725,6 +3129,48 @@
         1.0,
         1.0,
         1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "one_hop": {
+      "accuracy": [
+        0.905556,
+        0.458889,
+        0.757778,
+        0.297778,
+        0.458889,
+        0.458889,
+        0.458889,
+        0.458889
+      ],
+      "ci_high": [
+        0.923333,
+        0.492222,
+        0.781111,
+        0.327778,
+        0.492222,
+        0.492222,
+        0.491111,
+        0.488889
+      ],
+      "ci_low": [
+        0.885556,
+        0.424444,
+        0.732222,
+        0.27,
+        0.424444,
+        0.426667,
+        0.424444,
+        0.425556
+      ],
+      "hop3_rate": [
+        1.0,
+        0.0,
+        0.666667,
         0.0,
         0.0,
         0.0,

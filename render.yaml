@@ -11,6 +11,14 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
+    # No persistent disk in this Blueprint. The free plan cannot mount one,
+    # and the plan above is left unchanged. On a paid instance you can add:
+    #   disk:
+    #     name: dreamgraph-state
+    #     mountPath: /var/lib/dreamgraph
+    #     sizeGB: 1
+    # and set DG_STATE_DIR=/var/lib/dreamgraph/state. container_boot.sh
+    # restores that directory into moto before graph-node starts.
     envVars:
       - key: HYDRADB_AUTH_TOKEN
         generateValue: true

@@ -30,6 +30,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY dreamgraph ./dreamgraph
+COPY data ./data
 COPY results ./results
 COPY seed.py ./
 COPY scripts/container_boot.sh /usr/local/bin/container_boot.sh

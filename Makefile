@@ -2,7 +2,7 @@ PYTHON ?= python3
 VENV ?= .venv
 BIN := $(VENV)/bin
 
-.PHONY: install test bench probe web serve check
+.PHONY: install test bench evidence probe web serve check
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -14,6 +14,9 @@ test:
 
 bench:
 	$(BIN)/python -m dreamgraph.bench
+
+evidence:
+	$(BIN)/python -m dreamgraph.evidence
 
 probe:
 	$(BIN)/python scripts/probe_hydradb.py
