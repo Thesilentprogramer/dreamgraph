@@ -191,8 +191,12 @@ def build_explorer(claims: Path = CLAIMS, vuln_path: Path = VULN, poison_path: P
         add_link(project_id, version_id, "has")
         add_link(cve_id, version_id, "about")
         add_link(version_id, verdict_id, "gold")
-        votes = sorted(item["votes"])
+        votes = sorted(item["votes"], key=lambda feed: (feed != "nvd", feed))
         visible, hidden = votes[:VISIBLE_CLAIMS], votes[VISIBLE_CLAIMS:]
+        # A group of one or two claims is just those claims.
+        if len(hidden) < 3:
+            visible = votes
+            hidden = []
 
         def claim_node(feed: str) -> dict:
             vote = "affected" if item["votes"][feed] else "not affected"

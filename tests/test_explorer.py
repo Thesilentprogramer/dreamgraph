@@ -14,7 +14,8 @@ def test_explorer_graph_stays_under_the_cap_and_matches_the_file():
     built = build_explorer()
     assert 100 < built["node_count"] <= NODE_CAP
     assert built["node_count"] == len(built["nodes"])
-    assert any(node["type"] == "group" for node in built["nodes"])
+    assert any(node["type"] == "group" and node["count"] >= 3 for node in built["nodes"])
+    assert all(node.get("count", 3) >= 3 for node in built["nodes"] if node["type"] == "group")
     assert any(node["type"] == "feed" for node in built["nodes"])
     assert len(built["iterations"]) == 8
     assert built["iterations"][3]["drift"] is True

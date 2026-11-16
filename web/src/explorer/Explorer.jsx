@@ -54,39 +54,58 @@ function paint(node, costs) {
 function radiusOf(node, costs) {
   if (node.type === "feed") {
     const cost = costs[node.name] ?? node.cost ?? 1;
-    return 3.2 + 7.5 / (1 + cost);
+    return 1.35 + 1.7 / (1 + cost);
   }
-  if (node.type === "group") return 3.4;
-  if (node.type === "project" || node.type === "cve") return 2.6;
-  if (node.type === "verdict") return 2.2;
-  return 1.5;
+  if (node.type === "group") return 1.15;
+  if (node.type === "project" || node.type === "cve") return 1.05;
+  if (node.type === "verdict") return 0.9;
+  return 0.62;
 }
 
-function labelFor(node) {
+function endId(value) {
+  return value?.id || value;
+}
+
+function neighborIdsOf(focusId, links) {
+  const ids = new Set();
+  if (!focusId) return ids;
+  for (const link of links) {
+    const source = endId(link.source);
+    const target = endId(link.target);
+    if (source === focusId) ids.add(target);
+    else if (target === focusId) ids.add(source);
+  }
+  return ids;
+}
+
+function makeLabel(node) {
   const el = document.createElement("div");
   el.textContent = node.name;
   el.style.color = "#ffffff";
   el.style.fontFamily = "Inter, Outfit, sans-serif";
-  el.style.fontSize = node.type === "claim" || node.type === "version" ? "10px" : "12px";
+  el.style.fontSize = "12px";
   el.style.fontWeight = "500";
   el.style.letterSpacing = "0.01em";
-  el.style.textShadow = "0 1px 6px rgba(0,0,0,0.9)";
+  el.style.textShadow = "0 1px 6px rgba(0,0,0,0.95)";
   el.style.pointerEvents = "none";
   el.style.whiteSpace = "nowrap";
+  el.dataset.id = node.id;
+  el.style.display = "none";
+  node.__label = el;
   const object = new CSS2DObject(el);
-  object.position.set(0, radiusOf(node, {}) + 1.4, 0);
+  object.position.set(0, radiusOf(node, {}) + 0.7, 0);
   return object;
 }
 
 function sphereFor(node, costs) {
   const group = new THREE.Group();
-  const color = paint(node, costs);
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(radiusOf(node, costs), 20, 20),
-    new THREE.MeshBasicMaterial({ color }),
+    new THREE.SphereGeometry(radiusOf(node, costs), 18, 18),
+    new THREE.MeshBasicMaterial({ color: paint(node, costs), transparent: true, opacity: 0.28 }),
   );
+  node.__mesh = mesh;
   group.add(mesh);
-  if (node.type !== "claim") group.add(labelFor(node));
+  group.add(makeLabel(node));
   return group;
 }
 
@@ -106,6 +125,7 @@ export default function Explorer({ onClose }) {
   const [hidden, setHidden] = useState({ company: true, person: true });
   const [iteration, setIteration] = useState(8);
   const [selected, setSelected] = useState(null);
+  const [hovered, setHovered] = useState(null);
   const [panel, setPanel] = useState(true);
   const [tab, setTab] = useState("overview");
   const [query, setQuery] = useState("is linux v2.6.16 affected by CVE-2022-3628?");
@@ -113,6 +133,7 @@ export default function Explorer({ onClose }) {
   const [ask, setAsk] = useState(null);
   const [askError, setAskError] = useState("");
   const [pulse, setPulse] = useState(() => new Set());
+  const [framed, setFramed] = useState(0);
   const [modal, setModal] = useState(null);
   const [extraNodes, setExtraNodes] = useState([]);
   const [extraLinks, setExtraLinks] = useState([]);
@@ -159,15 +180,139 @@ export default function Explorer({ onClose }) {
     return { nodes, links };
   }, [graph, hidden, extraNodes, extraLinks, opened]);
 
+  const focusNeighbors = useMemo(
+    () => neighborIdsOf(selected?.id, visible.links),
+    [selected, visible.links],
+  );
+
+  const sceneGraph = useMemo(() => {
+    const nodes = visible.nodes;
+    const focusId = selected?.id;
+    const links = visible.links.filter((link) => {
+      if (!focusId) return false;
+      if (pulse.has(link.id)) return true;
+      const source = endId(link.source);
+      const target = endId(link.target);
+      return source === focusId || target === focusId;
+    });
+    if (focusId) {
+      const nearIds = new Set(focusNeighbors);
+      for (const link of links) {
+        const source = endId(link.source);
+        const target = endId(link.target);
+        if (source !== focusId) nearIds.add(source);
+        if (target !== focusId) nearIds.add(target);
+      }
+      const near = nodes.filter((node) => nearIds.has(node.id));
+      const rest = nodes.filter((node) => node.id !== focusId && !nearIds.has(node.id));
+      const pin = (node, x, y, z) => {
+        node.fx = x;
+        node.fy = y;
+        node.fz = z;
+        node.x = x;
+        node.y = y;
+        node.z = z;
+      };
+      const focus = nodes.find((node) => node.id === focusId);
+      if (focus) pin(focus, 0, 0, 0);
+      const crowded = near.length > 14;
+      near.forEach((node, index) => {
+        if (!crowded) {
+          const angle = (index / Math.max(near.length, 1)) * Math.PI * 2 - Math.PI / 2;
+          const ring = 42;
+          pin(node, Math.cos(angle) * ring, Math.sin(angle) * ring * 0.72, Math.sin(angle * 2) * 8);
+          return;
+        }
+        const y = 1 - (index / Math.max(near.length - 1, 1)) * 2;
+        const radial = Math.sqrt(Math.max(0, 1 - y * y));
+        const theta = Math.PI * (3 - Math.sqrt(5)) * index;
+        const radius = 96;
+        pin(node, Math.cos(theta) * radial * radius, y * radius * 0.62, Math.sin(theta) * radial * radius);
+      });
+      rest.forEach((node, index) => {
+        const angle = (index / Math.max(rest.length, 1)) * Math.PI * 2;
+        const shell = 640 + (index % 8) * 24;
+        pin(node, Math.cos(angle) * shell, Math.sin(angle) * shell * 0.22, ((index % 7) - 3) * 40);
+      });
+    }
+    return { nodes, links };
+  }, [visible, selected, focusNeighbors, pulse]);
+
+  useEffect(() => {
+    if (!graph || selected) return;
+    const focal =
+      graph.nodes.find((node) => node.id === "version:linux:v2.6.16") ||
+      graph.nodes.find((node) => node.type === "version") ||
+      graph.nodes.find((node) => node.type === "feed" && node.name === "nvd");
+    if (focal) setSelected(focal);
+  }, [graph, selected]);
+
+  useEffect(() => {
+    if (!selected || !fgRef.current) return;
+    const distance = focusNeighbors.size > 14 ? 230 : 96;
+    fgRef.current.cameraPosition({ x: 16, y: 28, z: distance }, { x: 0, y: 0, z: 0 }, 900);
+    const early = setTimeout(() => setFramed((count) => count + 1), 400);
+    const later = setTimeout(() => setFramed((count) => count + 1), 1400);
+    return () => {
+      clearTimeout(early);
+      clearTimeout(later);
+    };
+  }, [selected, focusNeighbors]);
+
+  useEffect(() => {
+    const show = new Set();
+    if (selected?.id) show.add(selected.id);
+    if (hovered?.id) show.add(hovered.id);
+    for (const id of focusNeighbors) show.add(id);
+    for (const node of visible.nodes) {
+      if (node.type === "feed") show.add(node.id);
+      const mesh = node.__mesh;
+      const el = node.__label;
+      const isFocus = node.id === selected?.id;
+      const isNeighbor = focusNeighbors.has(node.id);
+      const isHover = node.id === hovered?.id;
+      if (el) {
+        el.style.display = show.has(node.id) ? "block" : "none";
+        el.style.fontSize = isFocus ? "13px" : isNeighbor || isHover ? "9px" : "11px";
+      }
+      if (mesh?.material) {
+        mesh.material.color.set(paint(node, costs));
+        mesh.material.opacity = isFocus || isNeighbor ? 0.96 : node.type === "feed" ? 0.5 : 0.14;
+      }
+    }
+    const layer = extraRenderers[0]?.domElement;
+    const newest = new Map();
+    layer?.querySelectorAll("[data-id]").forEach((el) => {
+      const previous = newest.get(el.dataset.id);
+      if (previous) previous.remove();
+      newest.set(el.dataset.id, el);
+    });
+    const camera = fgRef.current?.camera?.();
+    const origin = new THREE.Vector3();
+    newest.forEach((el, id) => {
+      const node = visible.nodes.find((item) => item.id === id);
+      let onScreen = true;
+      if (camera && node) {
+        const placed = origin.set(node.x || 0, node.y || 0, node.z || 0).clone().project(camera);
+        const far = Math.hypot(node.x || 0, node.y || 0, node.z || 0) > 180;
+        onScreen = placed.z < 1 && Math.abs(placed.x) < 0.9 && Math.abs(placed.y) < 0.86 && !far;
+      }
+      const visibleLabel = show.has(id) && (id === selected?.id || onScreen);
+      el.style.display = visibleLabel ? "block" : "none";
+      const neighborOnly = focusNeighbors.has(id) && id !== selected?.id && !id?.startsWith("feed:");
+      el.style.fontSize = id === selected?.id ? "13px" : neighborOnly || id === hovered?.id ? "9px" : "11px";
+    });
+  }, [selected, hovered, focusNeighbors, visible.nodes, costs, extraRenderers, framed]);
+
   useEffect(() => {
     if (!webgl || !fgRef.current || !graph) return undefined;
     const fg = fgRef.current;
     const composer = fg.postProcessingComposer();
-    const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.85, 0.45, 0.18);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.32, 0.22, 0.46);
     composer.addPass(bloom);
     const controls = fg.controls();
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.4;
+    controls.autoRotateSpeed = 0.12;
     controls.enableDamping = true;
     const pause = () => {
       controls.autoRotate = false;
@@ -210,24 +355,11 @@ export default function Explorer({ onClose }) {
     };
   }, [webgl, graph]);
 
-  function flyTo(node) {
-    const fg = fgRef.current;
-    if (!fg || node?.x == null) return;
-    const distance = 90;
-    const hypot = Math.hypot(node.x, node.y, node.z) || 1;
-    const ratio = 1 + distance / hypot;
-    fg.cameraPosition({ x: node.x * ratio, y: node.y * ratio, z: node.z * ratio }, node, 1600);
-  }
-
   function onNodeClick(node) {
     setSelected(node);
     setPanel(true);
     setTab("overview");
-    if (node.type === "group") {
-      setModal(node);
-      return;
-    }
-    flyTo(node);
+    if (node.type === "group") setModal(node);
   }
 
   function explode(group) {
@@ -262,7 +394,6 @@ export default function Explorer({ onClose }) {
     setSelected(node);
     setPanel(true);
     if (node.type === "group") setModal(node);
-    flyTo(node);
   }
 
   async function askHydra(event) {
@@ -301,10 +432,7 @@ export default function Explorer({ onClose }) {
       );
       setPulse(lit);
       const node = visible.nodes.find((item) => item.id === match.versionId);
-      if (node) {
-        setSelected(node);
-        flyTo(node);
-      }
+      if (node) setSelected(node);
       setAsk({
         pending: false,
         steps: [
@@ -330,7 +458,6 @@ export default function Explorer({ onClose }) {
           return visible.nodes.find((node) => node.id === otherId);
         })
         .filter(Boolean)
-        .slice(0, 12)
     : [];
 
   return (
@@ -477,7 +604,7 @@ export default function Explorer({ onClose }) {
       {webgl && graph && (
         <ForceGraph3D
           ref={fgRef}
-          graphData={visible}
+          graphData={sceneGraph}
           extraRenderers={extraRenderers}
           backgroundColor="#0a0a0a"
           showNavInfo={false}
@@ -492,20 +619,26 @@ export default function Explorer({ onClose }) {
             return node ? paint(node, costs) : "#94a3b8";
           }}
           linkOpacity={(link) => {
-            const cost = costs[link.feed] ?? 1;
-            return pulse.has(link.id) ? 0.95 : 0.12 + 0.45 / (1 + cost);
+            if (pulse.has(link.id)) return 0.9;
+            const source = endId(link.source);
+            const target = endId(link.target);
+            const near = source === selected?.id || target === selected?.id;
+            if (!near) return 0.035;
+            const trust = 1 / (1 + (costs[link.feed] ?? 1));
+            return 0.15 + 0.2 * trust;
           }}
           linkWidth={(link) => {
-            const cost = costs[link.feed] ?? 1;
-            return (pulse.has(link.id) ? 2.4 : 0.35) + 1.8 / (1 + cost);
+            if (pulse.has(link.id)) return 0.45;
+            const trust = 1 / (1 + (costs[link.feed] ?? 1));
+            return 0.06 + 0.28 * trust;
           }}
+          onNodeHover={setHovered}
           linkDirectionalParticles={(link) => (pulse.has(link.id) ? 4 : 0)}
           linkDirectionalParticleWidth={1.5}
           linkDirectionalParticleSpeed={0.01}
           linkDirectionalParticleColor={() => "#ffffff"}
           onNodeClick={onNodeClick}
-          cooldownTicks={120}
-          warmupTicks={40}
+          cooldownTicks={0}
         />
       )}
 
