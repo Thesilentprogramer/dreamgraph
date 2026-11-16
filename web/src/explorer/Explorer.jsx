@@ -64,7 +64,7 @@ function makeLabel(node) {
   if (!el) {
     el = document.createElement("div");
     el.textContent = node.name;
-    el.style.color = BLUE;
+    el.style.color = "#111";
     el.style.fontFamily = "IBM Plex Mono, ui-monospace, monospace";
     el.style.fontSize = "11px";
     el.style.fontWeight = "500";
@@ -426,9 +426,9 @@ export default function Explorer({ onClose }) {
     : [];
 
   return (
-    <div className="fixed inset-0 z-40 bg-[#F0F2F1] text-[#070EF4]">
+    <div className="explorer-root fixed inset-0 z-40">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3">
-        <button type="button" onClick={onClose} className="pointer-events-auto border-2 border-[#070EF4] bg-[#F0F2F1] px-3 py-1.5 text-xs uppercase tracking-[0.14em]">
+        <button type="button" onClick={onClose} className="pointer-events-auto border-[3px] border-black bg-[#F3EDE2] shadow-[4px_4px_0_#000] px-3 py-1.5 text-xs uppercase tracking-[0.14em]">
           Back to dashboard
         </button>
         <div className="pointer-events-auto flex flex-col items-end gap-2">
@@ -438,11 +438,11 @@ export default function Explorer({ onClose }) {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search CVE, feed, version"
               aria-label="Search the graph"
-              className="w-56 border-2 border-[#070EF4] bg-[#F0F2F1] px-3 py-1.5 text-xs uppercase outline-none"
+              className="w-56 border-[3px] border-black bg-[#F3EDE2] shadow-[4px_4px_0_#000] px-3 py-1.5 text-xs uppercase outline-none"
             />
           </form>
           {graph && (
-            <label className="meta flex items-center gap-2 border-2 border-[#070EF4] bg-[#F0F2F1] px-3 py-1.5">
+            <label className="meta flex items-center gap-2 border-[3px] border-black bg-[#F3EDE2] shadow-[4px_4px_0_#000] px-3 py-1.5">
               Iteration {iteration}
               {frame?.drift ? " · newer feeds" : ""}
               {frame?.rollback ? " · guard rollback" : ""}
@@ -461,7 +461,7 @@ export default function Explorer({ onClose }) {
       </div>
 
       {panel && (
-        <aside className="absolute bottom-16 left-3 top-16 z-20 flex w-[22rem] max-w-[calc(100%-1.5rem)] flex-col border-2 border-[#070EF4] bg-[#F0F2F1] p-4">
+        <aside className="absolute bottom-16 left-3 top-16 z-20 flex w-[22rem] max-w-[calc(100%-1.5rem)] flex-col border-[3px] border-black bg-[#F3EDE2] shadow-[4px_4px_0_#000] p-4">
           <div className="flex items-start justify-between gap-2">
             <p className="meta">
               {selected ? `${TYPE_LABEL[selected.type] || selected.type} / ${selected.cluster || "vuln"}` : "Graph"}
@@ -480,8 +480,8 @@ export default function Explorer({ onClose }) {
                 className="px-3 py-1 uppercase tracking-[0.12em]"
                 style={
                   tab === name
-                    ? { background: "#070EF4", color: "#F4F5FA", border: "2px solid #070EF4" }
-                    : { background: "#F0F2F1", color: "#070EF4", border: "2px solid #070EF4" }
+                    ? { background: "#070EF4", color: "#F4F5FA", border: "3px solid #000", boxShadow: "4px 4px 0 #000" }
+                    : { background: "#F3EDE2", color: "#111", border: "3px solid #000", boxShadow: "4px 4px 0 #000" }
                 }
               >
                 {name === "overview" ? "Overview" : "Ask HydraDB"}
@@ -524,9 +524,9 @@ export default function Explorer({ onClose }) {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 aria-label="Ask HydraDB"
-                className="h-24 border-2 border-[#070EF4] bg-[#F0F2F1] p-2 text-sm outline-none"
+                className="h-24 border-[3px] border-black bg-[#F3EDE2] shadow-[4px_4px_0_#000] p-2 text-sm outline-none"
               />
-              <button type="submit" className="bg-[#070EF4] px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-[#F4F5FA]">
+              <button type="submit" className="sq sq-invert">
                 Run weighted path
               </button>
               {askError && <p className="text-xs">{askError}</p>}
@@ -542,22 +542,22 @@ export default function Explorer({ onClose }) {
         </aside>
       )}
       {!panel && (
-        <button type="button" onClick={() => setPanel(true)} className="absolute left-3 top-16 z-20 border-2 border-[#070EF4] bg-[#F0F2F1] px-3 py-1.5 text-xs uppercase">
+        <button type="button" onClick={() => setPanel(true)} className="absolute left-3 top-16 z-20 border-[3px] border-black bg-[#F3EDE2] shadow-[4px_4px_0_#000] px-3 py-1.5 text-xs uppercase">
           Show context
         </button>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-2 border-t-2 border-[#070EF4] bg-[#F0F2F1] px-3 py-2 text-[11px]">
+      <div className="absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-2 border-t-[3px] border-black bg-[#F3EDE2] px-3 py-2 text-[11px]">
         {(graph?.types || Object.keys(TYPE_LABEL)).map((type) => (
           <button
             key={type}
             type="button"
             aria-pressed={!hidden[type]}
             onClick={() => setHidden((current) => ({ ...current, [type]: !current[type] }))}
-            className="inline-flex items-center gap-1.5 border-2 border-[#070EF4] px-2 py-1 uppercase"
-            style={{ opacity: hidden[type] ? 0.35 : 1, background: hidden[type] ? "transparent" : "#070EF4", color: hidden[type] ? "#070EF4" : "#F4F5FA" }}
+            className="inline-flex items-center gap-1.5 border-[3px] border-black px-2 py-1 uppercase shadow-[3px_3px_0_#000]"
+            style={{ opacity: hidden[type] ? 0.45 : 1, background: hidden[type] ? "#F3EDE2" : "#070EF4", color: hidden[type] ? "#111" : "#F4F5FA" }}
           >
-            <span className="inline-block h-2 w-2" style={{ background: hidden[type] ? "#070EF4" : "#F4F5FA" }} />
+            <span className="inline-block h-2 w-2" style={{ background: hidden[type] ? "#111" : "#F4F5FA" }} />
             {TYPE_LABEL[type] || type}
           </button>
         ))}
@@ -577,7 +577,7 @@ export default function Explorer({ onClose }) {
           ref={fgRef}
           graphData={sceneGraph}
           extraRenderers={extraRenderers}
-          backgroundColor="#F0F2F1"
+          backgroundColor="#F3EDE2"
           showNavInfo={false}
           nodeRelSize={1}
           nodeVal={(node) => radiusOf(node, costs)}
@@ -614,8 +614,8 @@ export default function Explorer({ onClose }) {
       )}
 
       {modal && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#F0F2F1]/80 p-4" role="dialog" aria-modal="true">
-          <div className="max-h-[80vh] w-full max-w-lg overflow-hidden border-2 border-[#070EF4] bg-[#F0F2F1] p-4">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#F3EDE2]/90 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[80vh] w-full max-w-lg overflow-hidden border-[3px] border-black bg-[#F3EDE2] shadow-[4px_4px_0_#000] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="meta">{modal.cve}</p>
@@ -632,7 +632,7 @@ export default function Explorer({ onClose }) {
                 </thead>
                 <tbody>
                   {(modal.members || []).map((member) => (
-                    <tr key={member.id} className="border-t-2 border-[#070EF4]">
+                    <tr key={member.id} className="border-t-[3px] border-black">
                       <td className="py-1.5">{member.feed}</td>
                       <td>{member.version}</td>
                       <td>{member.vote}</td>
@@ -641,7 +641,7 @@ export default function Explorer({ onClose }) {
                 </tbody>
               </table>
             </div>
-            <button type="button" onClick={() => explode(modal)} className="mt-4 bg-[#070EF4] px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-[#F4F5FA]">
+            <button type="button" onClick={() => explode(modal)} className="sq sq-invert mt-4">
               Show on graph instead
             </button>
           </div>

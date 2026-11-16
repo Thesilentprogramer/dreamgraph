@@ -4,17 +4,11 @@
   --font-sans: "Inter", "Arial", sans-serif;
   --font-display: "Big Shoulders Display", "Arial Narrow", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --color-ink: #070ef4;
-  --color-frame: #050ec5;
-  --color-paper: #f0f2f1;
+  --color-ink: #111111;
+  --color-paper: #f3ede2;
+  --color-blue: #070ef4;
+  --color-lime: #d6ff4a;
   --color-inverse: #f4f5fa;
-  --color-muted: #070ef4;
-  --color-bg: #f0f2f1;
-  --color-card: #f0f2f1;
-  --color-line: #070ef4;
-  --color-accent: #070ef4;
-  --color-teal: #070ef4;
-  --color-danger: #070ef4;
 }
 
 html,
@@ -25,9 +19,11 @@ body,
 
 body {
   margin: 0;
-  background: #050ec5;
-  color: #070ef4;
+  background: #070ef4;
+  color: #111;
   font-family: Inter, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
 }
 
 button,
@@ -36,20 +32,30 @@ select,
 textarea {
   border-radius: 0;
   font-family: inherit;
+}
+
+a {
   color: inherit;
 }
 
+.wrap {
+  width: min(1120px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
 .frame {
-  margin: 24px;
-  min-height: calc(100vh - 48px);
-  background: #f0f2f1;
-  color: #070ef4;
+  margin: 16px;
+  min-height: calc(100vh - 32px);
+  background: #f3ede2;
+  color: #111;
+  border: 3px solid #000;
+  box-shadow: 6px 6px 0 #000;
 }
 
 .meta {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 11px;
-  letter-spacing: 0.22em;
+  font-size: 12px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -57,7 +63,8 @@ textarea {
   font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
   text-transform: uppercase;
   letter-spacing: -0.03em;
-  line-height: 0.82;
+  line-height: 0.86;
+  font-weight: 800;
 }
 
 .display-thin {
@@ -68,10 +75,28 @@ textarea {
   font-weight: 900;
 }
 
+.nb {
+  border: 3px solid #000;
+  background: #f3ede2;
+  box-shadow: 6px 6px 0 #000;
+}
+
+.nb-flat {
+  border: 3px solid #000;
+  background: #f3ede2;
+  box-shadow: none;
+}
+
+.kpi,
+.tile,
+.sq {
+  border: 3px solid #000;
+  background: #f3ede2;
+  color: #111;
+  box-shadow: 6px 6px 0 #000;
+}
+
 .kpi {
-  border: 2px solid #070ef4;
-  background: #f0f2f1;
-  color: #070ef4;
   min-height: 148px;
   padding: 16px 18px 14px;
   display: flex;
@@ -79,36 +104,32 @@ textarea {
   justify-content: space-between;
 }
 
-.kpi-invert {
-  background: #070ef4;
-  color: #f4f5fa;
-}
-
-.rule {
-  height: 2px;
-  background: #070ef4;
-  border: 0;
-}
-
-.tile {
-  border: 2px solid #070ef4;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  background: #f0f2f1;
-}
-
+.kpi-invert,
+.sq-invert,
 .tile-invert {
   background: #070ef4;
   color: #f4f5fa;
 }
 
+.rule {
+  height: 3px;
+  background: #000;
+  border: 0;
+}
+
+.tile {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
 .bar-track {
   height: 22px;
-  border: 2px solid #070ef4;
-  background: #f0f2f1;
+  border: 3px solid #000;
+  background: #f3ede2;
+  box-shadow: 3px 3px 0 #000;
 }
 
 .bar-fill {
@@ -117,34 +138,105 @@ textarea {
 }
 
 .sq {
-  border: 2px solid #070ef4;
-  background: transparent;
-  color: #070ef4;
-  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
   cursor: pointer;
+  text-decoration: none;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
-.sq-invert {
+.sq:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 4px 4px 0 #000;
+}
+
+.sq:active {
+  transform: translate(6px, 6px);
+  box-shadow: 0 0 0 #000;
+}
+
+.sq:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #070ef4;
+  outline-offset: 3px;
+}
+
+.landing section {
+  padding: 72px 0;
+}
+
+.landing .hero {
+  min-height: calc(100svh - 32px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 28px;
+}
+
+.landing h1 {
+  font-size: 72px;
+  max-width: 16ch;
+}
+
+.landing h2 {
+  font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  font-weight: 800;
+  font-size: 48px;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.stat {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 38px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.band-lime {
+  background: #d6ff4a;
+}
+
+.band-blue {
   background: #070ef4;
   color: #f4f5fa;
 }
 
-.insight {
+.steps {
   display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: 8px;
-  align-items: start;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
-.insight-mark {
-  width: 22px;
-  height: 22px;
-  border: 2px solid #070ef4;
-  display: grid;
-  place-items: center;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  line-height: 1;
+.step-no {
+  font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  font-weight: 900;
+  font-size: 64px;
+  line-height: 0.8;
+}
+
+[data-enter] {
+  animation: enter 0.55s ease both;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .dg-range {
@@ -152,7 +244,7 @@ textarea {
   width: 128px;
   height: 2px;
   margin: 0;
-  background: #070ef4;
+  background: #111;
   border: 0;
   border-radius: 0;
   outline: none;
@@ -160,23 +252,60 @@ textarea {
 
 .dg-range::-webkit-slider-thumb {
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: #070ef4;
-  border: 0;
+  border: 3px solid #000;
   border-radius: 0;
 }
 
 .dg-range::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: #070ef4;
-  border: 0;
+  border: 3px solid #000;
   border-radius: 0;
 }
 
-@media (max-width: 720px) {
+@media (prefers-reduced-motion: reduce) {
+  [data-enter],
+  .sq {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 800px) {
+  body {
+    font-size: 16px;
+  }
+
+  .wrap {
+    width: min(1120px, calc(100% - 32px));
+  }
+
   .frame {
-    margin: 12px;
+    margin: 8px;
+  }
+
+  .landing h1 {
+    font-size: 38px;
+  }
+
+  .landing h2 {
+    font-size: 30px;
+  }
+
+  .stat {
+    font-size: 28px;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
+  .landing .hero {
+    min-height: auto;
+    padding: 28px 0 48px;
   }
 }

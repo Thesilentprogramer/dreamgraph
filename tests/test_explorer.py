@@ -31,5 +31,7 @@ def test_explorer_route_serves_the_precomputed_graph():
     body = response.json()
     assert body["node_count"] <= NODE_CAP
     assert body["links"]
+    main = (ROOT / "web" / "src" / "main.jsx").read_text()
     assert "react-force-graph" not in (ROOT / "web" / "src" / "App.jsx").read_text()
-    assert "import(" in (ROOT / "web" / "src" / "App.jsx").read_text()
+    assert "react-force-graph" not in main
+    assert "import(" in main

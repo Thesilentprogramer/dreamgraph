@@ -1,7 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Chart, { LABELS } from "./Chart.jsx";
-
-const Explorer = lazy(() => import("./explorer/Explorer.jsx"));
 
 const GITHUB = "https://github.com/Thesilentprogramer/dreamgraph";
 
@@ -48,7 +46,6 @@ export default function App() {
   const [liveLoad, setLiveLoad] = useState(null);
   const [liveBusy, setLiveBusy] = useState(false);
   const [engine, setEngine] = useState(null);
-  const [screen, setScreen] = useState("dash");
 
   useEffect(() => {
     let cancelled = false;
@@ -236,11 +233,6 @@ export default function App() {
 
   return (
     <div className="frame">
-      {screen === "graph" && (
-        <Suspense fallback={<div className="fixed inset-0 z-40 bg-[#F0F2F1] p-8 text-sm text-[#070EF4]">Loading the graph…</div>}>
-          <Explorer onClose={() => setScreen("dash")} />
-        </Suspense>
-      )}
       <div className="px-6 py-5 sm:px-10">
         <div className="flex items-center justify-between gap-4">
           <p className="meta">DreamGraph · HydraDB OSS</p>
@@ -253,12 +245,9 @@ export default function App() {
             <span className="display-thin"> + trust it</span>
           </h1>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="sq sq-invert" onClick={() => setScreen("graph")}>
-              Open the graph
-            </button>
-            <a className="sq" href={GITHUB}>
-              GitHub
-            </a>
+            <a className="sq" href="/">Home</a>
+            <a className="sq sq-invert" href="/graph">Open the 3D graph</a>
+            <a className="sq" href={GITHUB}>Get the GitHub repo</a>
           </div>
         </div>
         <p className="mt-6 max-w-2xl text-base leading-7">
@@ -365,13 +354,13 @@ export default function App() {
         </div>
         <ul className="mt-4">
           {hypotheses.map((item) => (
-            <li key={item.id} className="grid gap-2 border-t-2 border-[#070EF4] py-3 sm:grid-cols-[4rem_1fr_5rem]">
+            <li key={item.id} className="grid gap-2 border-t-2 border-black py-3 sm:grid-cols-[4rem_1fr_5rem]">
               <p className="meta">{item.id}</p>
               <div>
                 <p className="text-sm leading-6">{item.statement}</p>
                 <p className="meta mt-1">{item.observed}</p>
               </div>
-              <p className={item.verdict === "PASS" ? "meta bg-[#070EF4] px-2 py-1 text-[#F4F5FA]" : "meta border-2 border-[#070EF4] px-2 py-1"}>{item.verdict}</p>
+              <p className={item.verdict === "PASS" ? "meta bg-[#070EF4] px-2 py-1 text-[#F4F5FA]" : "meta border-2 border-black px-2 py-1"}>{item.verdict}</p>
             </li>
           ))}
         </ul>
@@ -403,7 +392,7 @@ export default function App() {
               ))}
             </div>
             <label className="meta mt-4 block" htmlFor="relation">{queryDataset === "vuln" ? "Package tag" : "Company"}</label>
-            <select id="relation" className="mt-2 w-full border-2 border-[#070EF4] bg-[#F0F2F1] px-3 py-2 text-sm" value={rel ?? ""} onChange={(event) => setRel(Number(event.target.value))}>
+            <select id="relation" className="mt-2 w-full border-2 border-black bg-[#F0F2F1] px-3 py-2 text-sm" value={rel ?? ""} onChange={(event) => setRel(Number(event.target.value))}>
               {questions.map((id) => (
                 <option key={id} value={id}>
                   {labels ? labels[String(id)] || `Question ${id}` : `Relation ${id}`}
@@ -419,7 +408,7 @@ export default function App() {
                 <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-2">
                   {query.path.map((node, index) => (
                     <div key={`${node.id}-${index}`} className="flex items-center gap-2">
-                      <div className="min-w-[9rem] border-2 border-[#070EF4] px-3 py-2">
+                      <div className="min-w-[9rem] border-2 border-black px-3 py-2">
                         <p className="meta">{node.kind}</p>
                         <p className="text-sm leading-5">{node.name}</p>
                       </div>
@@ -440,7 +429,7 @@ export default function App() {
                     : `${rollbackTotal} rollbacks. Each receipt keeps the score before and after the proposal.`}
                 </p>
               </div>
-              <select aria-label="Seed filter" className="border-2 border-[#070EF4] bg-[#F0F2F1] px-2 py-1 text-sm" value={seedFilter} onChange={(event) => setSeedFilter(event.target.value)}>
+              <select aria-label="Seed filter" className="border-2 border-black bg-[#F0F2F1] px-2 py-1 text-sm" value={seedFilter} onChange={(event) => setSeedFilter(event.target.value)}>
                 <option value="all">All seeds</option>
                 {(view.config?.seeds || results.config.seeds).map((seed) => (
                   <option key={seed} value={String(seed)}>Seed {seed}</option>
@@ -449,7 +438,7 @@ export default function App() {
             </div>
             <ol className="mt-4 max-h-[28rem] space-y-2 overflow-y-auto">
               {policies.slice(0, 24).map((version) => (
-                <li key={`${version.version}-${version.seed}-${version.iteration}`} className="border-t-2 border-[#070EF4] py-2">
+                <li key={`${version.version}-${version.seed}-${version.iteration}`} className="border-t-2 border-black py-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm">v{version.version} · iter {version.iteration} · seed {version.seed}</p>
                     <p className="meta">{version.rolled_back ? "Rolled back" : "Accepted"}</p>
