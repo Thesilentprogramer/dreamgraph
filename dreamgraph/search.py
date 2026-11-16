@@ -7,6 +7,7 @@ unweighted result is reproducible and is not secretly sorted by source name.
 from __future__ import annotations
 
 import heapq
+import math
 from dataclasses import dataclass
 
 from dreamgraph.world import Edge, World
@@ -120,3 +121,76 @@ def predict_relation(world: World, rel_id: int, costs: dict[str, float] | None) 
 
 def is_correct(world: World, rel_id: int, prediction: Prediction) -> bool:
     return prediction.person == world.gold[rel_id]
+
+
+def combine_ends(paths: list[tuple[float, int]], *, k: int, margin: float | None) -> tuple[int | None, float]:
+    """Trust-weighted vote over the paths a search actually returned.
+
+    ``paths`` is ``(weight, end)`` pairs. Only the ``k`` cheapest are kept.
+    A margin keeps a clearly cheaper path from being outvoted by a pile of
+    worse ones: ends more than ``margin`` above the cheapest weight drop out.
+    Ties prefer the lower end id, and a boolean end prefers ``True``.
+    """
+
+    if k <= 0:
+        raise ValueError("path count must be positive")
+    if not paths:
+        return None, float("inf")
+    ordered = sorted(paths, key=lambda item: (item[0], item[1] if not isinstance(item[1], bool) else int(item[1])))[:k]
+    if margin is not None:
+        limit = ordered[0][0] + margin
+        kept = [item for item in ordered if item[0] <= limit + 1e-9]
+        ordered = kept or ordered[:1]
+    scores: dict[int, float] = {}
+    for weight, end in ordered:
+        scores[end] = scores.get(end, 0.0) + math.exp(-weight)
+
+    def tie(end: int) -> float:
+        if isinstance(end, bool):
+            return float(end)
+        return -float(end)
+
+    chosen = max(scores, key=lambda end: (scores[end], tie(end)))
+    weight = min(item[0] for item in ordered if item[1] == chosen)
+    return chosen, weight
+
+
+def vote_world(
+    world: World,
+    rel_id: int,
+    book,
+    *,
+    k: int = 1,
+    margin: float | None = None,
+    conditional: bool = False,
+) -> Prediction:
+    """Vote the chains of one question. ``book is None`` weighs every edge at 1."""
+
+    project = None
+    if conditional and book is not None:
+        project = world.projects.get(rel_id)
+    paths: list[tuple[float, int]] = []
+    by_end: dict[int, tuple[float, tuple[int, ...], tuple[str, ...]]] = {}
+    for chain in world.chains[rel_id]:
+        nodes = [world.edges[chain.edge_indexes[0]].src]
+        sources = []
+        weight = 0.0
+        for index in chain.edge_indexes:
+            edge = world.edges[index]
+            step = 1.0 if book is None else book.weight(edge.source, project)
+            if step <= 0:
+                raise ValueError("edge cost must stay positive; gold edges are not pinned")
+            weight += step
+            nodes.append(edge.dst)
+            sources.append(edge.source)
+        path = tuple(nodes)
+        paths.append((weight, chain.person))
+        current = by_end.get(chain.person)
+        key = (weight, path)
+        if current is None or key < (current[0], current[1]):
+            by_end[chain.person] = (weight, path, tuple(sources))
+    chosen, weight = combine_ends(paths, k=k, margin=margin)
+    if chosen is None or chosen not in by_end:
+        return Prediction(None, (world.leaf[rel_id],), (), float("inf"))
+    _stored, path, sources = by_end[chosen]
+    return Prediction(chosen, path, sources, weight)

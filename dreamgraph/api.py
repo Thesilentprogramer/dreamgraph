@@ -263,10 +263,24 @@ def query(
         world = vuln_world(document)
         if rel not in world.leaf:
             raise HTTPException(status_code=404, detail=f"unknown vulnerability question {rel}")
-        costs = None if mode == "unweighted" else document["vuln"]["demo"]["costs"]
+        demo = document["vuln"]["demo"]
+        costs = None if mode == "unweighted" else demo["costs"]
+        vote = demo.get("vote")
         graph = _ensure_vuln_edge(world, rel)
         if costs is not None:
-            graph.stamp_source_costs(costs, rel)
+            if vote:
+                project = world.projects.get(rel)
+                pair = {}
+                for key, value in (demo.get("conditional") or {}).items():
+                    source, _, name = key.partition("|")
+                    pair[(source, name)] = float(value)
+                from dreamgraph.learner import CostBook
+
+                book = CostBook({key: float(value) for key, value in costs.items()}, pair)
+                present = {edge.source for edge in world.edges if edge.rel_id == rel}
+                graph.stamp_source_costs({source: book.weight(source, project) for source in present}, rel)
+            else:
+                graph.stamp_source_costs(costs, rel)
     else:
         world = demo_world(document)
         if rel not in world.leaf:
@@ -275,7 +289,11 @@ def query(
         graph = _ensure_loaded(world)
         if costs is not None:
             graph.stamp_source_costs(costs)
-    prediction = graph.owner(world, rel, costs)
+    vote_spec = document["vuln"]["demo"].get("vote") if dataset == "vuln" else None
+    if vote_spec and costs is not None:
+        prediction = graph.voted_owner(world, rel, k=int(vote_spec["k"]), margin=vote_spec.get("margin"))
+    else:
+        prediction = graph.owner(world, rel, costs)
     return _path_payload(world, rel, mode, costs, prediction)
 
 

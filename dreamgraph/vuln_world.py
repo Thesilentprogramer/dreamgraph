@@ -156,6 +156,7 @@ def generate_vuln_world(seed: int, train_questions: int = TRAIN_QUESTIONS) -> Wo
     names: dict[int, str] = {}
     kinds: dict[int, str] = {}
     modified: dict[int, str] = {}
+    projects: dict[int, str] = {}
     train_rels: list[int] = []
     held_rels: list[int] = []
 
@@ -177,6 +178,7 @@ def generate_vuln_world(seed: int, train_questions: int = TRAIN_QUESTIONS) -> Wo
         persons.add(affected_id)
         persons.add(clean_id)
         modified[rel_id] = question["modified"]
+        projects[rel_id] = question["repo"]
         chains[rel_id] = []
         ordered = [source for source in sources if source in question["votes"]]
         for slot, source in enumerate(ordered):
@@ -209,6 +211,7 @@ def generate_vuln_world(seed: int, train_questions: int = TRAIN_QUESTIONS) -> Wo
         kinds=kinds,
         train_rels=train_rels,
         heldout_rels=held_rels,
+        projects=projects,
     )
     world.modified = modified  # type: ignore[attr-defined]
     world.question_count = len(questions)  # type: ignore[attr-defined]

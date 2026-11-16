@@ -4,9 +4,18 @@ from __future__ import annotations
 
 import random
 
-from dreamgraph.config import BATCH, BOOTSTRAP, DRIFT_ITER, GUARD, ITERS, SEEDS, WINDOW
-from dreamgraph.learner import consider_update, refit_costs, window_slice
-from dreamgraph.search import build_index, cheapest_owner, one_hop_owner
+from dreamgraph.config import BATCH, BOOTSTRAP, DRIFT_ITER, ITERS, SEEDS
+from dreamgraph.learner import (
+    VULN_GUARD,
+    VULN_PATH_K,
+    VULN_PATH_MARGIN,
+    VULN_WINDOW,
+    CostBook,
+    consider_book,
+    refit_book,
+    snapshot_review,
+)
+from dreamgraph.search import one_hop_owner, vote_world
 from dreamgraph.vuln_world import (
     MIRROR,
     apply_label_swap,
@@ -32,7 +41,7 @@ def _run(
     guard: int,
     bootstrap: int,
 ) -> dict:
-    from dreamgraph.evidence import _dict_bits, _greedy, _hits, _mean, _series
+    from dreamgraph.evidence import _greedy, _hits, _mean, _series
 
     questions = load_questions()
     costs_prior = hand_set_costs(questions)
@@ -40,10 +49,13 @@ def _run(
     report = drift_report(questions)
     simulate = (not poison) and report["kind"] == "simulated"
     methods = (
-        ("dreamgraph", "dict_learner", "naive", "greedy", "unweighted", "frozen_at_3", "one_hop")
+        ("dreamgraph", "dict_learner", "naive", "greedy", "unweighted", "frozen_at_3", "one_hop", "nvd_only")
         if poison
         else (
             "dreamgraph",
+            "conditional_k1",
+            "topk_open",
+            "per_feed",
             "unweighted",
             "hand_set",
             "one_shot",
@@ -69,128 +81,110 @@ def _run(
     for seed_index, seed in enumerate(seeds):
         world = generate_vuln_world(seed)
         rng = random.Random(40_000 + seed)
-        log: list[int] = []
-        uniform = {source: 1.0 for source in sources}
-        costs = {name: dict(uniform) for name in ("dreamgraph", "one_shot", "dict_learner", "greedy", "frozen_at_3", "naive")}
-        costs["hand_set"] = dict(costs_prior)
+        log: list[dict] = []
+        prefix: list[dict] = []
+        uniform = CostBook({source: 1.0 for source in sources}, {})
+        book = uniform.copy()
+        one_shot = uniform.copy()
+        frozen = uniform.copy()
+        naive = uniform.copy()
+        greedy = {source: 1.0 for source in sources}
         good = {source: 0.0 for source in sources}
         bad = {source: 0.0 for source in sources}
-        index = build_index(world.edges)
-        dict_edges = world.edges_as_dicts()
-        dict_index = build_index(dict_edges)
-        scoring_costs = None
+        scoring_book = None
+
+        def predict(method: str):
+            def one(rel_id: int):
+                spec = {
+                    "dreamgraph": (book, VULN_PATH_K, VULN_PATH_MARGIN, True),
+                    "dict_learner": (book, VULN_PATH_K, VULN_PATH_MARGIN, True),
+                    "conditional_k1": (book, 1, None, True),
+                    "topk_open": (book, VULN_PATH_K, None, True),
+                    "per_feed": (book, 1, None, False),
+                    "naive": (naive, VULN_PATH_K, VULN_PATH_MARGIN, True),
+                    "one_shot": (one_shot, VULN_PATH_K, VULN_PATH_MARGIN, True),
+                    "frozen_at_3": (frozen, VULN_PATH_K, VULN_PATH_MARGIN, True),
+                    "hand_set": (CostBook(dict(costs_prior), {}), 1, None, False),
+                    "greedy": (CostBook(greedy, {}), 1, None, False),
+                    "unweighted": (None, 1, None, False),
+                }
+                if method == "majority":
+                    return majority_hit(world, rel_id), 0
+                if method == "nvd_only":
+                    return source_only_hit(world, rel_id, "nvd"), 0
+                if method == "ghsa_only":
+                    return source_only_hit(world, rel_id, "ghsa"), 0
+                if method == "bm25":
+                    return bm25_hit(world, rel_id), 0
+                if method == "one_hop":
+                    prediction = one_hop_owner(world, rel_id, book.feed)
+                else:
+                    chosen, path_k, path_margin, conditional = spec[method]
+                    prediction = vote_world(
+                        world, rel_id, chosen, k=path_k, margin=path_margin, conditional=conditional
+                    )
+                hit = 1 if prediction.person == world.gold[rel_id] else 0
+                return hit, 1 if len(prediction.path) - 1 >= 3 else 0
+
+            return one
 
         for step in range(1, iters + 1):
             if poison and step == DRIFT_ITER:
                 world.poison_source = "nvd"
                 world.poison_false_friend = MIRROR
+                prefix = list(log)
             if simulate and step == DRIFT_ITER:
                 apply_label_swap(world)
-                index = build_index(world.edges)
-                dict_edges = world.edges_as_dicts()
-                dict_index = build_index(dict_edges)
 
-            def predict(method: str, method_costs):
-                def one(rel_id: int):
-                    if method == "majority":
-                        return majority_hit(world, rel_id), 0
-                    if method == "nvd_only":
-                        return source_only_hit(world, rel_id, "nvd"), 0
-                    if method == "ghsa_only":
-                        return source_only_hit(world, rel_id, "ghsa"), 0
-                    if method == "bm25":
-                        return bm25_hit(world, rel_id), 0
-                    if method == "one_hop":
-                        prediction = one_hop_owner(world, rel_id, method_costs)
-                    elif method == "dict_learner":
-                        prediction = cheapest_owner(
-                            dict_edges, world.leaf[rel_id], world.persons, method_costs, dict_index
-                        )
-                    else:
-                        prediction = cheapest_owner(
-                            world.edges, world.leaf[rel_id], world.persons, method_costs, index
-                        )
-                    hit = 1 if prediction.person == world.gold[rel_id] else 0
-                    return hit, 1 if len(prediction.path) - 1 >= 3 else 0
-
-                return one
-
-            plan = {
-                "unweighted": None,
-                "one_hop": costs["dreamgraph"],
-                "dreamgraph": costs["dreamgraph"],
-                "hand_set": costs["hand_set"],
-                "one_shot": costs["one_shot"],
-                "greedy": costs["greedy"],
-                "frozen_at_3": costs["frozen_at_3"],
-                "dict_learner": costs["dict_learner"],
-                "naive": costs["naive"],
-                "majority": None,
-                "nvd_only": None,
-                "ghsa_only": None,
-                "bm25": None,
-            }
             for method in methods:
-                hits, hops = _hits(world.heldout_rels, predict(method, plan[method]))
+                hits, hops = _hits(world.heldout_rels, predict(method))
                 outcomes[method][step - 1][seed_index] = hits
                 hop3[method][step - 1][seed_index] = hops
             if seed == seeds[0] and step == iters:
-                scoring_costs = dict(costs["dreamgraph"])
+                scoring_book = book.copy()
 
             if poison:
                 batch = [rng.choice(world.train_rels) for _ in range(batch_size)]
             else:
                 batch = chronological_batch(world, step, iters, batch_size)
-            log.extend(batch)
+            log.extend(snapshot_review(world, rel_id) for rel_id in batch)
             version_counter += 1
-            costs["dreamgraph"], version = consider_update(
+            book, version = consider_book(
                 log,
-                world,
-                costs["dreamgraph"],
+                book,
                 iteration=step,
                 seed=seed,
                 version=version_counter,
                 window=window,
                 guard=guard,
+                prefix=prefix if prefix else None,
             )
             version.heldout_before = _mean(outcomes["dreamgraph"][step - 1][seed_index])
-            proposed_hits, _ = _hits(world.heldout_rels, predict("dreamgraph", version.proposed_costs))
+            proposed_book = version.proposed_book
+            proposed_hits = [
+                1 if vote_world(
+                    world, rel_id, proposed_book, k=VULN_PATH_K, margin=VULN_PATH_MARGIN, conditional=True
+                ).person == world.gold[rel_id] else 0
+                for rel_id in world.heldout_rels
+            ]
             version.heldout_after = _mean(proposed_hits)
             policies.append(version.as_dict())
             if version.rolled_back:
                 rollback_counts[seed] += 1
-
-            sliced = window_slice(log, window)
-            if guard > 0 and len(sliced) > guard + 5:
-                fit_on, guard_on = sliced[:-guard], sliced[-guard:]
-            else:
-                fit_on, guard_on = sliced, []
-            proposed = refit_costs(fit_on, world)
-            if guard_on:
-                new_hits, _ = _dict_bits(
-                    guard_on, dict_edges, dict_index, world.leaf, world.gold, world.persons, proposed
-                )
-                old_hits, _ = _dict_bits(
-                    guard_on, dict_edges, dict_index, world.leaf, world.gold, world.persons, costs["dict_learner"]
-                )
-                costs["dict_learner"] = dict(costs["dict_learner"]) if _mean(new_hits) < _mean(old_hits) else proposed
-            else:
-                costs["dict_learner"] = proposed
             if poison:
-                costs["naive"] = refit_costs(sliced, world)
-            costs["greedy"] = _greedy(good, bad, world, batch, sources)
+                naive = refit_book(log[-window:], prior=naive)
+            greedy = _greedy(good, bad, world, batch, sources)
             if not poison and step == 1:
-                costs["one_shot"] = dict(costs["dreamgraph"])
-            freeze_before = DRIFT_ITER if poison else DRIFT_ITER
-            if step < freeze_before:
-                costs["frozen_at_3"] = dict(costs["dreamgraph"])
+                one_shot = book.copy()
+            if step < DRIFT_ITER:
+                frozen = book.copy()
 
         final_costs.append(
-            {"seed": seed, "dreamgraph": {key: round(value, 6) for key, value in costs["dreamgraph"].items()}}
+            {"seed": seed, "dreamgraph": {key: round(value, 6) for key, value in book.feed.items()}}
         )
         if seed == seeds[0]:
             demo_world = world
-            demo_costs = scoring_costs
+            demo_book = scoring_book
         print(f"vuln {'poison ' if poison else ''}seed {seed} rollbacks {rollback_counts[seed]}", flush=True)
 
     series = _series(outcomes, hop3, iters, bootstrap, random.Random(4 if poison else 3))
@@ -213,10 +207,14 @@ def _run(
             "train_questions": len(generate_vuln_world(seeds[0]).train_rels),
             "held_out": len(generate_vuln_world(seeds[0]).heldout_rels),
             "bootstrap": bootstrap,
+            "path_k": VULN_PATH_K,
+            "path_margin": VULN_PATH_MARGIN,
             "protocol": (
-                "score then update; chronological batches by feed modified time"
+                "score then update; feed×project shrinkage; chronological batches; "
+                "algo.SSpaths top-5 vote within 0.15 of the cheapest path"
                 if not poison
-                else "score then update; from iteration 4 train feedback treats nvd as wrong and nvd_mirror as right"
+                else "score then update; from iteration 4 new reviews treat nvd as wrong and nvd_mirror as right; "
+                "earlier reviews stay as logged and a drop on that prefix rolls the proposal back"
             ),
         },
     }
@@ -225,8 +223,9 @@ def _run(
             {
                 "scenario": (
                     "nvd_mirror republishes the opposite of NVD's range on every question. From iteration 4, "
-                    "training reviews treat NVD as always wrong and that mirror as always right. Held-out edges "
-                    "stay as built, and the guard scores both policies against the Zenodo label."
+                    "new training reviews treat NVD as always wrong and that mirror as always right. Reviews "
+                    "already logged stay as written. Held-out edges stay as built. A proposal that drops "
+                    "accuracy on the pre-poison reviews, or on the recent guard slice, is rolled back."
                 ),
                 "poison_iter": DRIFT_ITER,
                 "poison_source": "nvd",
@@ -255,10 +254,12 @@ def _run(
             }
         )
     disagree = []
-    assert demo_costs is not None
+    assert demo_book is not None
     for rel_id in demo_world.heldout_rels:
-        learned = cheapest_owner(demo_world.edges, demo_world.leaf[rel_id], demo_world.persons, demo_costs).person
-        plain = cheapest_owner(demo_world.edges, demo_world.leaf[rel_id], demo_world.persons, None).person
+        learned = vote_world(
+            demo_world, rel_id, demo_book, k=VULN_PATH_K, margin=VULN_PATH_MARGIN, conditional=True
+        ).person
+        plain = vote_world(demo_world, rel_id, None, k=1).person
         if learned != plain:
             disagree.append(rel_id)
         if len(disagree) >= 8:
@@ -282,7 +283,11 @@ def _run(
             "hand_set": {key: costs_prior[key] for key in sources},
             "demo": {
                 "seed": seeds[0],
-                "costs": {key: round(value, 6) for key, value in demo_costs.items()},
+                "costs": {key: round(value, 6) for key, value in demo_book.feed.items()},
+                "conditional": {
+                    f"{source}|{project}": round(value, 6) for (source, project), value in demo_book.pair.items()
+                },
+                "vote": {"k": VULN_PATH_K, "margin": VULN_PATH_MARGIN, "procedure": "algo.SSpaths"},
                 "questions": questions_demo,
                 "disagree": disagree,
                 "labels": {str(rel_id): demo_world.names[demo_world.leaf[rel_id]] for rel_id in questions_demo},
@@ -290,6 +295,8 @@ def _run(
             "notes": [
                 "nvd_mirror is a modeled aggregator that flips NVD's verdict. It is not a downloaded feed.",
                 "GHSA is scored as an abstaining baseline: the Advisory API had no version ranges for this gold set.",
+                "Costs shrink a feed×project rate toward the feed rate (strength 8). A pair with no reviews uses the feed cost.",
+                "The headline vote is exp(-path weight) over the 5 cheapest paths, keeping those within 0.15 of the cheapest.",
                 "Question order inside an iteration follows feed modified timestamps.",
                 report["note"],
             ],
@@ -298,13 +305,34 @@ def _run(
     return document
 
 
+def confirm_vote(world, book, rels: list[int]) -> dict:
+    """Score a sample with algo.SSpaths and vote the paths the engine returned."""
+
+    from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
+    from dreamgraph.hydra_graph import HydraGraph
+
+    graph = HydraGraph(HYDRA_URL, HYDRA_TOKEN)
+    matched = 0
+    checked = 0
+    for rel_id in rels:
+        graph.load(world, rel_ids={rel_id})
+        project = world.projects.get(rel_id)
+        sources = {edge.source for edge in world.edges if edge.rel_id == rel_id}
+        graph.stamp_source_costs({source: book.weight(source, project) for source in sources}, rel_id)
+        engine = graph.voted_owner(world, rel_id, k=VULN_PATH_K, margin=VULN_PATH_MARGIN)
+        local = vote_world(world, rel_id, book, k=VULN_PATH_K, margin=VULN_PATH_MARGIN, conditional=True)
+        checked += 1
+        matched += int(engine.person == local.person and engine.person is not None)
+    return {"checked": checked, "matched": matched, "procedure": "algo.SSpaths", "k": VULN_PATH_K, "margin": VULN_PATH_MARGIN}
+
+
 def run_vuln(**kwargs) -> dict:
-    defaults = dict(seeds=SEEDS, iters=ITERS, batch_size=BATCH, window=WINDOW, guard=GUARD, bootstrap=BOOTSTRAP)
+    defaults = dict(seeds=SEEDS, iters=ITERS, batch_size=BATCH, window=VULN_WINDOW, guard=VULN_GUARD, bootstrap=BOOTSTRAP)
     defaults.update(kwargs)
     return _run(poison=False, **defaults)
 
 
 def run_vuln_poison(**kwargs) -> dict:
-    defaults = dict(seeds=SEEDS, iters=ITERS, batch_size=BATCH, window=WINDOW, guard=GUARD, bootstrap=BOOTSTRAP)
+    defaults = dict(seeds=SEEDS, iters=ITERS, batch_size=BATCH, window=VULN_WINDOW, guard=VULN_GUARD, bootstrap=BOOTSTRAP)
     defaults.update(kwargs)
     return _run(poison=True, **defaults)

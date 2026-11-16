@@ -6,6 +6,50 @@ whatever the inequality says. Nothing in here edits a number to make a pass.
 
 from __future__ import annotations
 
+# Written down before the conditional-cost re-run. Thresholds are not fit to that run.
+PREREGISTERED = (
+    {
+        "id": "H13",
+        "dataset": "vuln",
+        "evidence": "results/vuln_summary.json",
+        "statement": (
+            "On the vulnerability slice, DreamGraph — feed×project shrinkage costs, "
+            "algo.SSpaths with pathCount and resultLimit both 5, and a trust-weighted vote "
+            "of the returned paths within 0.15 of the cheapest — exceeds NVD-only final "
+            "held-out accuracy by at least 0.01."
+        ),
+    },
+    {
+        "id": "H14",
+        "dataset": "vuln",
+        "evidence": "results/vuln_summary.json",
+        "statement": (
+            "On the vulnerability slice, restricting that vote to paths within 0.15 of the "
+            "cheapest exceeds an unrestricted top-5 vote of the same conditional costs by at least 0.01."
+        ),
+    },
+    {
+        "id": "H15",
+        "dataset": "vuln",
+        "evidence": "results/vuln_summary.json",
+        "statement": (
+            "On the vulnerability slice, the cheapest path under feed×project costs exceeds "
+            "the cheapest path under the same policy's per-feed costs by at least 0.01."
+        ),
+    },
+    {
+        "id": "H16",
+        "dataset": "vuln-poison",
+        "evidence": "results/vuln_poison.json",
+        "statement": (
+            "On the vulnerability poison run, the guard rolls back at least once on every seed, "
+            "including seed 2. Reviews stay as logged, and a proposal must not degrade the "
+            "reviews collected before the poison iteration."
+        ),
+    },
+)
+
+
 STATEMENTS = (
     {
         "id": "H1",

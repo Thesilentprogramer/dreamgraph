@@ -58,11 +58,23 @@ def test_vuln_query_matches_the_in_process_sum():
     assert body["dataset"] == "vuln"
     assert body["path"][0]["kind"] == "question"
     assert body["path"][-1]["kind"] == "verdict"
-    from dreamgraph.search import predict_relation
+    from dreamgraph.learner import CostBook
+    from dreamgraph.search import predict_relation, vote_world
     from dreamgraph.vuln_world import generate_vuln_world
 
-    world = generate_vuln_world(document["vuln"]["demo"]["seed"])
-    prediction = predict_relation(world, rel, document["vuln"]["demo"]["costs"])
+    demo = document["vuln"]["demo"]
+    world = generate_vuln_world(demo["seed"])
+    if demo.get("vote"):
+        pair = {}
+        for key, value in (demo.get("conditional") or {}).items():
+            source, _, name = key.partition("|")
+            pair[(source, name)] = float(value)
+        book = CostBook({key: float(value) for key, value in demo["costs"].items()}, pair)
+        prediction = vote_world(
+            world, rel, book, k=int(demo["vote"]["k"]), margin=demo["vote"].get("margin"), conditional=True
+        )
+    else:
+        prediction = predict_relation(world, rel, demo["costs"])
     assert body["person"] == prediction.person
     assert len(body["path"]) == len(prediction.path)
 

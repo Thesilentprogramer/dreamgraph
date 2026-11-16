@@ -167,3 +167,156 @@ def consider_update(
         proposed_costs=dict(proposed),
     )
     return chosen, snapshot
+
+
+@dataclass
+class CostBook:
+    """Per-feed costs plus a feed×project adjustment.
+
+    A missing pair uses the feed cost. Every weight stays strictly positive.
+    """
+
+    feed: dict[str, float]
+    pair: dict[tuple[str, str], float]
+
+    def weight(self, source: str, project: str | None = None) -> float:
+        if project is not None and (source, project) in self.pair:
+            value = self.pair[(source, project)]
+        else:
+            value = self.feed.get(source, 1.0)
+        if value <= 0:
+            raise ValueError("edge cost must stay positive; gold edges are not pinned")
+        return float(value)
+
+    def copy(self) -> CostBook:
+        return CostBook(dict(self.feed), dict(self.pair))
+
+
+# Locked before the vulnerability re-run. pathCount and resultLimit share this total.
+VULN_PATH_K = 5
+VULN_PATH_MARGIN = 0.15
+VULN_SHRINKAGE = 8.0
+VULN_WINDOW = 160
+VULN_GUARD = 40
+
+
+def snapshot_review(world: World, rel_id: int) -> dict:
+    """Freeze one review. Later poison flags must not rewrite it."""
+
+    votes: dict[str, bool] = {}
+    for source, correct in edge_feedback(world, rel_id):
+        votes[source] = bool(correct)
+    return {"rel": rel_id, "project": world.projects.get(rel_id, ""), "votes": votes}
+
+
+def refit_book(rows: list[dict], *, strength: float = VULN_SHRINKAGE, prior: CostBook | None = None) -> CostBook:
+    """Shrink a feed×project cost toward the feed cost. Sparse pairs back off."""
+
+    good: dict[str, float] = {}
+    bad: dict[str, float] = {}
+    pair_good: dict[tuple[str, str], float] = {}
+    pair_bad: dict[tuple[str, str], float] = {}
+    for row in rows:
+        project = row.get("project") or ""
+        for source, correct in row["votes"].items():
+            if correct:
+                good[source] = good.get(source, 0.0) + 1.0
+                if project:
+                    pair_good[(source, project)] = pair_good.get((source, project), 0.0) + 1.0
+            else:
+                bad[source] = bad.get(source, 0.0) + 1.0
+                if project:
+                    pair_bad[(source, project)] = pair_bad.get((source, project), 0.0) + 1.0
+    sources = set(good) | set(bad)
+    if prior is not None:
+        sources |= set(prior.feed)
+    feed: dict[str, float] = {}
+    for source in sources:
+        if source in good or source in bad:
+            feed[source] = (bad.get(source, 0.0) + 1.0) / (good.get(source, 0.0) + 1.0)
+        else:
+            feed[source] = 1.0 if prior is None else prior.feed.get(source, 1.0)
+    pair: dict[tuple[str, str], float] = {}
+    for key in set(pair_good) | set(pair_bad):
+        seen = pair_good.get(key, 0.0) + pair_bad.get(key, 0.0)
+        specific = (pair_bad.get(key, 0.0) + 1.0) / (pair_good.get(key, 0.0) + 1.0)
+        pair[key] = (seen * specific + strength * feed[key[0]]) / (seen + strength)
+    if any(value <= 0 for value in feed.values()) or any(value <= 0 for value in pair.values()):
+        raise RuntimeError("refit produced a non-positive cost")
+    return CostBook(feed, pair)
+
+
+def _review_rate(rows: list[dict], book: CostBook, *, k: int, margin: float | None) -> float | None:
+    if not rows:
+        return None
+    from dreamgraph.search import combine_ends
+
+    hits = 0
+    for row in rows:
+        project = row.get("project") or None
+        paths = [(2.0 * book.weight(source, project), bool(bit)) for source, bit in row["votes"].items()]
+        chosen, _weight = combine_ends(paths, k=k, margin=margin)
+        hits += int(bool(chosen))
+    return hits / len(rows)
+
+
+def consider_book(
+    log: list[dict],
+    current: CostBook,
+    *,
+    iteration: int,
+    seed: int,
+    version: int,
+    window: int = VULN_WINDOW,
+    guard: int = VULN_GUARD,
+    k: int = VULN_PATH_K,
+    margin: float | None = VULN_PATH_MARGIN,
+    prefix: list[dict] | None = None,
+) -> tuple[CostBook, PolicyVersion]:
+    """Refit a cost book. Roll back when the guard slice or a pinned prefix gets worse."""
+
+    sliced = log[-window:] if window > 0 else list(log)
+    if guard > 0 and len(sliced) > guard + 5:
+        fit_on = sliced[:-guard]
+        guard_on = sliced[-guard:]
+    else:
+        fit_on = sliced
+        guard_on = []
+    if prefix:
+        pinned = {id(item) for item in prefix}
+        fit_on = [item for item in fit_on if id(item) not in pinned]
+    proposed = current.copy() if not fit_on else refit_book(fit_on, prior=current)
+    guard_after = _review_rate(guard_on, proposed, k=k, margin=margin)
+    guard_before = _review_rate(guard_on, current, k=k, margin=margin)
+    prefix_after = _review_rate(prefix or [], proposed, k=k, margin=margin)
+    prefix_before = _review_rate(prefix or [], current, k=k, margin=margin)
+    rolled_back = False
+    reason = "accepted"
+    chosen = proposed
+    reported_before = guard_before
+    reported_after = guard_after
+    if guard_on and guard_after is not None and guard_before is not None and guard_after < guard_before:
+        rolled_back = True
+        reason = "guard accuracy fell"
+        chosen = current.copy()
+        reported_before, reported_after = guard_before, guard_after
+    elif prefix and prefix_after is not None and prefix_before is not None and prefix_after < prefix_before:
+        rolled_back = True
+        reason = "guard accuracy fell"
+        chosen = current.copy()
+        reported_before, reported_after = prefix_before, prefix_after
+    snapshot = PolicyVersion(
+        version=version,
+        iteration=iteration,
+        seed=seed,
+        costs=dict(chosen.feed),
+        rolled_back=rolled_back,
+        reason=reason,
+        window=len(sliced),
+        guard_accuracy=reported_after if not rolled_back else reported_before,
+        guard_before=reported_before,
+        guard_after=reported_after,
+        proposed_costs=dict(proposed.feed),
+    )
+    snapshot.proposed_book = proposed  # type: ignore[attr-defined]
+    return chosen, snapshot

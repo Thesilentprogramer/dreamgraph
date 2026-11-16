@@ -79,6 +79,7 @@ class World:
     # train relations only. Endpoints and held-out gold do not move.
     poison_source: str | None = None
     poison_false_friend: str | None = None
+    projects: dict[int, str] = field(default_factory=dict)
 
     def edges_as_dicts(self) -> list[dict]:
         return [edge.as_dict() for edge in self.edges]

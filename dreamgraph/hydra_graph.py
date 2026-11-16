@@ -120,6 +120,38 @@ class HydraGraph:
             return Prediction(None, (world.leaf[rel_id],), (), float("inf"))
         return Prediction(best[1][-1], best[1], best[2], best[0])
 
+    def ranked_paths(self, world: World, rel_id: int, *, k: int) -> list[tuple[float, int, tuple[int, ...], tuple[str, ...]]]:
+        """The paths ``algo.SSpaths`` returned. Callers vote these rows, not a private rerank."""
+
+        cypher, params = build_ss_paths(
+            src=world.leaf[rel_id],
+            weighted=True,
+            total=k,
+            max_len=3,
+            rel_types=["OWNS"],
+        )
+        found = []
+        for row in self.client.rows(cypher, params):
+            path = row[0]
+            if not isinstance(path, dict):
+                continue
+            nodes = tuple(int(node["id"]) for node in path["nodes"])
+            if len(nodes) < 2 or nodes[-1] not in world.persons:
+                continue
+            sources = tuple(rel["properties"].get("source", "") for rel in path["relationships"])
+            found.append((float(row[1]), nodes[-1], nodes, sources))
+        return found
+
+    def voted_owner(self, world: World, rel_id: int, *, k: int, margin: float | None) -> Prediction:
+        from dreamgraph.search import combine_ends
+
+        found = self.ranked_paths(world, rel_id, k=k)
+        chosen, weight = combine_ends([(item[0], item[1]) for item in found], k=k, margin=margin)
+        if chosen is None:
+            return Prediction(None, (world.leaf[rel_id],), (), float("inf"))
+        match = min((item for item in found if item[1] == chosen), key=lambda item: (item[0], item[2]))
+        return Prediction(match[1], match[2], match[3], match[0])
+
 
 def concurrent_latencies(base_url: str, token: str, src: int, rounds: int = 40, clients: int = 20) -> list[float]:
     """Milliseconds for ``clients`` workers each issuing ``rounds`` weighted searches."""
