@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import Chart, { LABELS } from "./Chart.jsx";
 
+const GITHUB = "https://github.com/Thesilentprogramer/dreamgraph";
+
 const SOURCE_COLOR = {
   wikidata: "#7aa2f7",
   registry: "#e2a15a",
-  scraper: "#e15d5d",
+  scraper: "#f07178",
+  "Revaluation Books": "#3cbfa8",
+  "The Book Depository": "#e2a15a",
+  textbooksNow: "#f07178",
 };
 
 function pct(value) {
@@ -23,26 +28,31 @@ function Pill({ children, tone = "neutral" }) {
     neutral: "border-line text-muted",
     warn: "border-accent/50 text-accent",
     ok: "border-teal/50 text-teal",
+    bad: "border-danger/50 text-danger",
   };
   return (
-    <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] ${tones[tone]}`}>
+    <span className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] ${tones[tone]}`}>
       {children}
     </span>
   );
 }
 
 function Card({ children, className = "" }) {
-  return <section className={`rounded-xl border border-line bg-card p-4 sm:p-5 ${className}`}>{children}</section>;
+  return <section className={`card p-4 sm:p-5 ${className}`}>{children}</section>;
 }
 
 function Mark() {
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-      <rect x="1" y="1" width="26" height="26" rx="7" fill="#14181f" stroke="#3cbfa8" />
-      <path d="M7 18.5 12 9l4 6 2.5-3.5L21 18.5" fill="none" stroke="#e2a15a" strokeWidth="1.6" />
-      <circle cx="12" cy="9" r="1.4" fill="#3cbfa8" />
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" rx="9" fill="#121722" stroke="#3cbfa8" />
+      <path d="M8 21.5 13.2 10l4.2 6.4 2.6-3.6L24 21.5" fill="none" stroke="#e2a15a" strokeWidth="1.7" />
+      <circle cx="13.2" cy="10" r="1.6" fill="#3cbfa8" />
     </svg>
   );
+}
+
+function last(series) {
+  return series.accuracy.length - 1;
 }
 
 export default function App() {
@@ -52,6 +62,8 @@ export default function App() {
   const [hidden, setHidden] = useState({});
   const [rel, setRel] = useState(null);
   const [mode, setMode] = useState("dreamgraph");
+  const [dataset, setDataset] = useState("synthetic");
+  const [queryDataset, setQueryDataset] = useState("synthetic");
   const [query, setQuery] = useState(null);
   const [queryError, setQueryError] = useState("");
   const [queryLoading, setQueryLoading] = useState(false);
@@ -73,8 +85,7 @@ export default function App() {
       .then((body) => {
         if (cancelled) return;
         setResults(body);
-        const first = body.demo?.questions?.[0];
-        setRel(first ?? null);
+        setRel(body.demo?.questions?.[0] ?? null);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "Could not load results");
@@ -108,11 +119,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (rel == null) return undefined;
+    if (!results) return;
+    const next = queryDataset === "book" ? results.public?.demo?.questions?.[0] : results.demo?.questions?.[0];
+    setRel(next ?? null);
+    setQuery(null);
+    setQueryError("");
+  }, [queryDataset, results]);
+
+  useEffect(() => {
+    if (rel == null || !results) return undefined;
+    const allowed =
+      queryDataset === "book" ? results.public?.demo?.questions || [] : results.demo?.questions || [];
+    if (!allowed.includes(rel)) return undefined;
     let cancelled = false;
     setQueryLoading(true);
     setQueryError("");
-    fetch(`/api/query?rel=${rel}&mode=${mode}`)
+    fetch(`/api/query?rel=${rel}&mode=${mode}&dataset=${queryDataset}`)
       .then(async (response) => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
@@ -124,7 +146,10 @@ export default function App() {
         if (!cancelled) setQuery(body);
       })
       .catch((err) => {
-        if (!cancelled) setQueryError(err.message || "Query failed");
+        if (!cancelled) {
+          setQuery(null);
+          setQueryError(err.message || "Query failed");
+        }
       })
       .finally(() => {
         if (!cancelled) setQueryLoading(false);
@@ -132,7 +157,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [rel, mode]);
+  }, [rel, mode, queryDataset, results]);
 
   async function remeasure() {
     setLiveBusy(true);
@@ -154,7 +179,7 @@ export default function App() {
         <p className="text-sm text-muted">Loading the benchmark export…</p>
         <div className="mt-6 grid gap-4 sm:grid-cols-4">
           {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className="h-24 animate-pulse rounded-xl border border-line bg-card" />
+            <div key={index} className="h-28 animate-pulse rounded-2xl border border-line bg-card" />
           ))}
         </div>
       </main>
@@ -165,129 +190,233 @@ export default function App() {
     return (
       <main className="mx-auto max-w-xl px-4 py-16">
         <Card>
-          <p className="text-xs uppercase tracking-[0.14em] text-accent">No benchmark export</p>
-          <h1 className="mt-2 text-2xl font-semibold">DreamGraph has nothing to chart yet</h1>
+          <p className="eyebrow">No benchmark export</p>
+          <h1 className="mt-2 font-serif text-3xl">DreamGraph has nothing to chart yet</h1>
           <p className="mt-3 text-sm leading-6 text-muted">
-            {error || "results/summary.json is missing."} The dashboard does not invent accuracies.
-            From the repo root, run <code className="text-ink">make bench</code> and reload.
+            {error || "results/summary.json is missing."} The dashboard does not invent accuracies. From the repo root, run{" "}
+            <code className="text-ink">make bench</code> and reload.
           </p>
         </Card>
       </main>
     );
   }
 
-  const dream = results.series.dreamgraph;
-  const last = dream.accuracy.length - 1;
-  const driftIndex = results.drift_iter - 1;
+  const book = results.public;
+  const poison = results.poison;
+  const hypotheses = results.hypotheses || [];
+  const view =
+    dataset === "book" && book?.series
+      ? book
+      : dataset === "poison" && poison?.series
+        ? poison
+        : results;
+  const series = view.series;
+  const dream = series.dreamgraph;
+  const end = last(dream);
+  const markers =
+    dataset === "poison"
+      ? [{ iter: poison.poison_iter, label: "Poison", color: "#f07178" }]
+      : dataset === "synthetic"
+        ? [{ iter: results.drift_iter, label: "Drift", color: "#e2a15a" }]
+        : [];
   const load = liveLoad || results.load;
-  const policies = results.policies
+  const policySource =
+    dataset === "poison" ? poison.policies || poison.receipts || [] : dataset === "book" ? book.policies || [] : results.policies;
+  const policies = policySource
     .filter((version) => seedFilter === "all" || String(version.seed) === seedFilter)
     .slice()
-    .sort((a, b) => Number(b.rolled_back) - Number(a.rolled_back) || a.version - b.version);
-  const rollbackTotal = results.policies.filter((version) => version.rolled_back).length;
+    .sort((a, b) => Number(b.rolled_back) - Number(a.rolled_back) || a.iteration - b.iteration || a.seed - b.seed);
+  const rollbackTotal =
+    dataset === "poison"
+      ? poison.rollback_count
+      : policySource.filter((version) => version.rolled_back).length;
+  const questions =
+    queryDataset === "book" ? book?.demo?.questions || [] : results.demo.questions || [];
+  const labels = queryDataset === "book" ? book?.demo?.labels || {} : null;
+  const oneHop = results.series.one_hop;
+  const passes = hypotheses.filter((item) => item.verdict === "PASS").length;
 
   const stats = [
     {
-      label: "After the window refits",
-      value: pct(dream.accuracy[last]),
-      detail: `95% CI ${pct(dream.ci_low[last])}–${pct(dream.ci_high[last])}`,
+      label: "Synthetic full path, iter 8",
+      value: pct(results.series.dreamgraph.accuracy.at(-1)),
+      detail: `95% CI ${pct(results.series.dreamgraph.ci_low.at(-1))}–${pct(results.series.dreamgraph.ci_high.at(-1))}`,
     },
     {
-      label: `At drift, iteration ${results.drift_iter}`,
-      value: pct(dream.accuracy[driftIndex]),
-      detail: "Scored before that iteration's update",
+      label: "1-hop lookup, same costs",
+      value: oneHop ? pct(oneHop.accuracy.at(-1)) : "—",
+      detail: oneHop ? `95% CI ${pct(oneHop.ci_low.at(-1))}–${pct(oneHop.ci_high.at(-1))}` : "Replay missing",
     },
     {
-      label: "Unweighted, every iteration",
-      value: pct(results.series.unweighted.accuracy[0]),
-      detail: "Tie break on node ids, drift-stable",
+      label: "Book sellers, held out",
+      value: book ? pct(book.series.dreamgraph.accuracy.at(-1)) : "—",
+      detail: book
+        ? `95% CI ${pct(book.series.dreamgraph.ci_low.at(-1))}–${pct(book.series.dreamgraph.ci_high.at(-1))} · ${book.config.held_out} books`
+        : "Slice missing",
     },
     {
-      label: "Hand-set costs after drift",
-      value: pct(results.series.hand_set.accuracy[last]),
-      detail: `Started at ${pct(results.series.hand_set.accuracy[0])}`,
+      label: "Guard rollbacks",
+      value: poison ? String(poison.rollback_count) : "0",
+      detail: poison ? `Poison from iteration ${poison.poison_iter}, 3 seeds` : "No poison scenario",
     },
   ];
 
+  const ablationRows =
+    dataset === "poison"
+      ? ["dreamgraph", "naive", "greedy", "frozen_at_3", "dict_learner", "one_hop", "unweighted"]
+      : dataset === "book"
+        ? ["dreamgraph", "one_hop", "unweighted", "dict_learner", "bm25", "hand_set", "greedy", "frozen_at_3"]
+        : ["dreamgraph", "one_hop", "unweighted", "dict_learner"];
+
+  const ablationNote =
+    dataset === "book"
+      ? "On this slice every seller is a 2-edge chain, so a 1-hop lookup and the full sum rank the same seller. Unweighted tie-breaks on alphabetical listing ids and already selects Revaluation Books, the most reliable of the three. Accuracy therefore ties. The learned costs are the part that recovers the seller ranking. BM25 tie-breaks on author-node id and does not."
+      : dataset === "poison"
+        ? "From iteration 4, train reviews call wikidata wrong and scraper right. Held-out people stay put. Naive accepts the lie. The guard scores the proposal on the last 20 window questions against the true owner and rolls back."
+        : "1-hop lookup spends the learned cost of the first edge only and never calls algo.SSpaths. Unweighted search counts hops. DreamGraph sums the learned costs; this synthetic run did that sum inside HydraDB. The dict learner sums the same costs in process, so the accuracies match. The gap that is not zero is the path sum versus a single edge.";
+
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex gap-3">
+      <header className="border-b border-line/80">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
             <Mark />
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">DreamGraph</h1>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-muted">
-                Ownership paths that relearn when a vendor’s labels flip. For compliance teams merging KYC and B2B entity graphs across Wikidata, a registry, and a scraper.
-              </p>
+              <p className="text-sm font-medium tracking-tight">DreamGraph</p>
+              <p className="text-xs text-muted">HydraDB Track 1</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 sm:justify-end">
-            <Pill tone="warn">Synthetic source noise</Pill>
-            <Pill tone={results.backend === "hydradb" ? "ok" : "neutral"}>
-              {results.backend === "hydradb" ? "HydraDB SSpaths" : "In-process graph"}
-            </Pill>
-            <Pill tone={engine?.live_engine ? "ok" : "warn"}>
-              {engine?.seeding
-                ? "Seeding HydraDB"
-                : engine?.live_engine
-                  ? "Live engine"
-                  : "Engine down"}
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone={engine?.seeding ? "warn" : engine?.live_engine ? "ok" : "warn"}>
+              {engine?.seeding ? "Seeding HydraDB" : engine?.live_engine ? "Live engine" : "Engine down"}
             </Pill>
             <Pill tone={results.hydra_verified ? "ok" : "warn"}>
               {results.hydra_verified ? "Benchmark on HydraDB" : "Benchmark unverified"}
             </Pill>
+            <a
+              href={GITHUB}
+              className="rounded-full border border-line px-3 py-1 text-xs text-ink transition hover:border-teal/50"
+            >
+              GitHub
+            </a>
           </div>
         </div>
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6">
+        <section className="rise">
+          <p className="eyebrow">Self-improving multi-vendor graph</p>
+          <h1 className="mt-3 max-w-3xl font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
+            The path cost learns which source to trust.
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-muted">
+            DreamGraph keeps a cost on each vendor, refits it from reviewer feedback, and asks HydraDB{" "}
+            <span className="text-ink">algo.SSpaths</span> for the cheapest path. A bad update is rolled back when it loses on the guard slice, and the receipt stays on the timeline.
+          </p>
+        </section>
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <Card key={stat.label}>
+          {stats.map((stat, index) => (
+            <Card key={stat.label} className="rise" style={{ animationDelay: `${index * 40}ms` }}>
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted">{stat.label}</p>
               <p className="tabular mt-2 font-mono text-3xl text-ink">{stat.value}</p>
-              <p className="mt-1 text-xs text-muted">{stat.detail}</p>
+              <p className="mt-1 text-xs leading-5 text-muted">{stat.detail}</p>
             </Card>
           ))}
         </div>
 
         <Card>
-          <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold">Held-out accuracy</h2>
-              <p className="text-sm text-muted">
-                {results.config.held_out} questions, {results.config.seeds.length} seeds. Bands are bootstrap 95% intervals. The marker is the label swap. After recovery, DreamGraph’s answers are 3-hop paths; unweighted stays on 2 hops.
+              <h2 className="font-serif text-2xl">Held-out accuracy</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
+                {dataset === "book"
+                  ? `${book.config.held_out} gold books, ${book.config.seeds.length} split seeds. Bands are bootstrap 95% intervals. No label drift on this slice.`
+                  : dataset === "poison"
+                    ? `${poison.config.held_out} synthetic questions, ${poison.config.seeds.length} seeds. The marker is when wikidata starts lying in the training reviews.`
+                    : `${results.config.held_out} questions, ${results.config.seeds.length} seeds. The marker is the wikidata/scraper label swap, scored before that iteration’s update.`}
               </p>
             </div>
-            <p className="text-xs text-muted">Precomputed export · {results.generated_at}</p>
+            <div className="inline-flex rounded-full border border-line bg-bg p-0.5" role="tablist" aria-label="Chart dataset">
+              {[
+                ["synthetic", "Synthetic"],
+                ["book", "Book sellers"],
+                ["poison", "Poison"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={dataset === value}
+                  onClick={() => setDataset(value)}
+                  className={`rounded-full px-3 py-1.5 text-sm transition ${dataset === value ? "bg-card text-ink" : "text-muted"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <Chart
-            series={results.series}
-            driftIter={results.drift_iter}
+            series={series}
+            markers={markers}
             hidden={hidden}
             onToggle={(method) => setHidden((current) => ({ ...current, [method]: !current[method] }))}
           />
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-xs">
+            <table className="w-full min-w-[720px] text-left text-xs">
               <caption className="sr-only">Accuracy by method and iteration</caption>
               <thead className="text-muted">
                 <tr>
                   <th className="py-1 pr-3 font-medium">Method</th>
                   {dream.accuracy.map((_, index) => (
-                    <th key={index} className="px-1 py-1 text-right font-medium">{index + 1}</th>
+                    <th key={index} className={`px-1 py-1 text-right font-medium ${markers.some((pin) => pin.iter === index + 1) ? "text-accent" : ""}`}>
+                      {index + 1}
+                    </th>
                   ))}
+                  <th className="px-1 py-1 text-right font-medium">Final CI</th>
                 </tr>
               </thead>
               <tbody>
-                {Object.keys(LABELS).map((method) => (
-                  <tr key={method} className="border-t border-line">
-                    <th className="py-1.5 pr-3 font-medium text-ink">{LABELS[method]}</th>
-                    {results.series[method].accuracy.map((value, index) => (
-                      <td key={index} className="tabular px-1 py-1.5 text-right font-mono text-muted">
-                        {(value * 100).toFixed(1)}
+                {Object.keys(series)
+                  .filter((method) => LABELS[method])
+                  .map((method) => (
+                    <tr key={method} className="border-t border-line">
+                      <th className="py-1.5 pr-3 font-medium text-ink">{LABELS[method]}</th>
+                      {series[method].accuracy.map((value, index) => (
+                        <td key={index} className="tabular px-1 py-1.5 text-right font-mono text-muted">
+                          {(value * 100).toFixed(1)}
+                        </td>
+                      ))}
+                      <td className="tabular px-1 py-1.5 text-right font-mono text-muted">
+                        {pct(series[method].ci_low?.[end])}–{pct(series[method].ci_high?.[end])}
                       </td>
-                    ))}
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="font-serif text-2xl">Ablations</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{ablationNote}</p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-[0.12em] text-muted">
+                <tr>
+                  <th className="py-2 pr-3 font-medium">Arm</th>
+                  <th className="py-2 pr-3 text-right font-medium">Final</th>
+                  <th className="py-2 text-right font-medium">3-hop rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ablationRows.filter((method) => series[method]).map((method) => (
+                  <tr key={method} className="border-t border-line">
+                    <th className="py-2 pr-3 text-left font-medium text-ink">{LABELS[method] || method}</th>
+                    <td className="tabular py-2 pr-3 text-right font-mono">{pct(series[method].accuracy.at(-1))}</td>
+                    <td className="tabular py-2 text-right font-mono text-muted">
+                      {series[method].hop3_rate ? series[method].hop3_rate.at(-1).toFixed(2) : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -295,14 +424,38 @@ export default function App() {
           </div>
         </Card>
 
+        <Card>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-2xl">Pre-registered hypotheses</h2>
+              <p className="mt-1 text-sm text-muted">
+                {passes} of {hypotheses.length} passed. Verdicts are computed from the evidence files, not typed in.
+              </p>
+            </div>
+          </div>
+          <ol className="mt-4 space-y-2">
+            {hypotheses.map((item) => (
+              <li key={item.id} className="grid gap-2 rounded-xl border border-line px-3 py-3 sm:grid-cols-[4.5rem_1fr_auto] sm:items-start">
+                <p className="font-mono text-sm text-muted">{item.id}</p>
+                <div>
+                  <p className="text-sm leading-6">{item.statement}</p>
+                  <p className="mt-1 font-mono text-xs text-muted">{item.observed}</p>
+                </div>
+                <Pill tone={item.verdict === "PASS" ? "ok" : "bad"}>{item.verdict}</Pill>
+              </li>
+            ))}
+            {hypotheses.length === 0 && <li className="text-sm text-muted">No hypothesis file in this export.</li>}
+          </ol>
+        </Card>
+
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-base font-semibold">Which owner does the path name?</h2>
-                <p className="text-sm text-muted">algo.SSpaths on the live node, from the saved edge costs. Not a stored answer.</p>
+                <h2 className="font-serif text-2xl">Live path</h2>
+                <p className="text-sm text-muted">algo.SSpaths on the running node. The answer is not stored in the page.</p>
               </div>
-              <div className="inline-flex rounded-lg border border-line bg-bg p-0.5" role="group" aria-label="Path mode">
+              <div className="inline-flex rounded-full border border-line bg-bg p-0.5" role="group" aria-label="Path mode">
                 {[
                   ["unweighted", "Unweighted"],
                   ["dreamgraph", "DreamGraph"],
@@ -312,52 +465,73 @@ export default function App() {
                     type="button"
                     aria-pressed={mode === value}
                     onClick={() => setMode(value)}
-                    className={`rounded-md px-3 py-1.5 text-sm ${mode === value ? "bg-card text-ink" : "text-muted"}`}
+                    className={`rounded-full px-3 py-1.5 text-sm ${mode === value ? "bg-card text-ink" : "text-muted"}`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
             </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                ["synthetic", "Ownership gadget"],
+                ["book", "Book seller"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={queryDataset === value}
+                  onClick={() => setQueryDataset(value)}
+                  className={`rounded-full border px-3 py-1 text-xs ${queryDataset === value ? "border-teal/50 text-teal" : "border-line text-muted"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <label className="mt-4 block text-xs uppercase tracking-[0.12em] text-muted" htmlFor="relation">
-              Company
+              {queryDataset === "book" ? "Book" : "Company"}
             </label>
             <select
               id="relation"
-              className="mt-1 w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-line bg-bg px-3 py-2 text-sm"
               value={rel ?? ""}
               onChange={(event) => setRel(Number(event.target.value))}
             >
-              {(results.demo.questions || []).map((id) => (
+              {questions.map((id) => (
                 <option key={id} value={id}>
-                  Northwind {id}
-                  {results.demo.disagree?.includes(id) ? " · modes disagree" : ""}
+                  {labels ? labels[String(id)] || `Book ${id}` : `Northwind ${id}`}
+                  {queryDataset === "synthetic" && results.demo.disagree?.includes(id) ? " · modes disagree" : ""}
                 </option>
               ))}
             </select>
+            {queryDataset === "book" && (book?.demo?.disagree || []).length === 0 && (
+              <p className="mt-2 text-xs leading-5 text-muted">
+                On this slice the two modes agree. Alphabetical listing ids already select Revaluation Books, and the learned costs do too.
+              </p>
+            )}
             {queryLoading && <p className="mt-4 text-sm text-muted">Walking the graph…</p>}
             {queryError && <p className="mt-4 text-sm text-danger">{queryError}</p>}
             {query && !queryLoading && (
               <div className="mt-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs ${query.correct ? "bg-teal/15 text-teal" : "bg-danger/15 text-danger"}`}>
-                    {query.correct ? "Names the true owner" : "Names someone else"}
+                    {query.correct ? "Matches gold" : "Does not match gold"}
                   </span>
                   <span className="text-xs text-muted">
-                    Gold record {query.gold_name} · weight {query.weight}
+                    Gold {query.gold_name} · weight {query.weight} · {query.procedure}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 overflow-x-auto pb-2">
                   {query.path.map((node, index) => (
-                    <div key={`${node.id}-${index}`} className="flex items-center gap-2">
-                      <div className="min-w-[9rem] rounded-lg border border-line bg-bg px-3 py-2">
+                    <div key={`${node.id}-${index}`} className="path-node flex items-center gap-2" style={{ animationDelay: `${index * 70}ms` }}>
+                      <div className="min-w-[9.5rem] rounded-xl border border-line bg-bg px-3 py-2">
                         <p className="text-[10px] uppercase tracking-[0.12em] text-muted">{node.kind}</p>
-                        <p className="text-sm">{node.name}</p>
+                        <p className="text-sm leading-5">{node.name}</p>
                       </div>
                       {query.edges[index] && (
                         <span
-                          className="text-[10px] uppercase tracking-[0.14em]"
-                          style={{ color: SOURCE_COLOR[query.edges[index].source] || "#8b97a8" }}
+                          className="max-w-[6.5rem] text-[10px] uppercase leading-4 tracking-[0.08em]"
+                          style={{ color: SOURCE_COLOR[query.edges[index].source] || "#93a0b5" }}
                         >
                           {query.edges[index].source}
                         </span>
@@ -367,14 +541,15 @@ export default function App() {
                 </div>
                 <ul className="mt-3 space-y-1 text-sm">
                   {query.alternatives.map((alt) => (
-                    <li key={alt.source} className="flex items-center justify-between gap-3 text-muted">
-                      <span style={{ color: SOURCE_COLOR[alt.source] }}>
-                        {alt.source}
+                    <li key={`${alt.label}-${alt.person}`} className="flex items-center justify-between gap-3 text-muted">
+                      <span style={{ color: SOURCE_COLOR[alt.label] || SOURCE_COLOR[alt.source] || "#93a0b5" }}>
+                        {alt.label || alt.source}
                         {alt.chosen ? " · chosen" : ""}
+                        {` · ${alt.hops} hop${alt.hops === 1 ? "" : "s"}`}
                       </span>
                       <span className="text-right text-ink">
                         {alt.person_name}
-                        {alt.correct ? " · true owner" : ""}
+                        {alt.correct ? " · gold" : ""}
                       </span>
                     </li>
                   ))}
@@ -386,34 +561,36 @@ export default function App() {
           <Card>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Policy versions</h2>
+                <h2 className="font-serif text-2xl">Guard receipts</h2>
                 <p className="text-sm text-muted">
                   {rollbackTotal === 0
-                    ? "The guard accepted every refit in this run."
-                    : `${rollbackTotal} rollback${rollbackTotal === 1 ? "" : "s"} when the guard slice got worse.`}
+                    ? "The guard accepted every refit in this view. Switch the chart to Poison to read the rollback receipts."
+                    : `${rollbackTotal} rollback${rollbackTotal === 1 ? "" : "s"}. A receipt keeps the metric before and after the proposal.`}
                 </p>
               </div>
               <select
                 aria-label="Seed filter"
-                className="rounded-lg border border-line bg-bg px-2 py-1 text-sm"
+                className="rounded-xl border border-line bg-bg px-2 py-1 text-sm"
                 value={seedFilter}
                 onChange={(event) => setSeedFilter(event.target.value)}
               >
                 <option value="all">All seeds</option>
-                {results.config.seeds.map((seed) => (
-                  <option key={seed} value={String(seed)}>Seed {seed}</option>
+                {(view.config?.seeds || results.config.seeds).map((seed) => (
+                  <option key={seed} value={String(seed)}>
+                    Seed {seed}
+                  </option>
                 ))}
               </select>
             </div>
-            <ol className="mt-4 max-h-[28rem] space-y-2 overflow-y-auto pr-1">
+            <ol className="mt-4 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
               {policies.map((version) => (
                 <li
-                  key={version.version}
-                  className={`rounded-lg border px-3 py-2 ${version.rolled_back ? "border-danger/60" : "border-line"}`}
+                  key={`${version.version}-${version.seed}-${version.iteration}`}
+                  className={`rounded-xl border px-3 py-2 ${version.rolled_back ? "border-danger/60 bg-danger/5" : "border-line"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm">
-                      Iteration {version.iteration}
+                      v{version.version} · iteration {version.iteration}
                       <span className="text-muted"> · seed {version.seed}</span>
                     </p>
                     <span className={`text-[11px] uppercase tracking-[0.12em] ${version.rolled_back ? "text-danger" : "text-teal"}`}>
@@ -421,16 +598,19 @@ export default function App() {
                     </span>
                   </div>
                   <p className="tabular mt-1 font-mono text-xs text-muted">
-                    wiki {version.costs.wikidata.toFixed(2)} · reg {version.costs.registry.toFixed(2)} · scrap {version.costs.scraper.toFixed(2)}
+                    {Object.entries(version.costs)
+                      .map(([name, value]) => `${name} ${Number(value).toFixed(2)}`)
+                      .join(" · ")}
                   </p>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1 text-xs leading-5 text-muted">
                     Window {version.window}
-                    {version.guard_accuracy == null ? "" : ` · guard ${pct(version.guard_accuracy)}`}
-                    {version.rolled_back ? ` · ${version.reason}` : ""}
+                    {version.guard_before == null ? "" : ` · guard ${pct(version.guard_before)} → ${pct(version.guard_after)}`}
+                    {version.heldout_before == null ? "" : ` · held-out ${pct(version.heldout_before)} → ${pct(version.heldout_after)}`}
+                    {version.reason ? ` · ${version.reason}` : ""}
                   </p>
                 </li>
               ))}
-              {policies.length === 0 && <li className="text-sm text-muted">No versions for this seed.</li>}
+              {policies.length === 0 && <li className="text-sm text-muted">No versions for this view.</li>}
             </ol>
           </Card>
         </div>
@@ -438,14 +618,14 @@ export default function App() {
         <Card>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold">Search latency</h2>
+              <h2 className="font-serif text-2xl">Search latency</h2>
               <p className="max-w-2xl text-sm text-muted">{load.what}</p>
             </div>
             <button
               type="button"
               onClick={remeasure}
               disabled={liveBusy}
-              className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink disabled:opacity-50"
+              className="rounded-full border border-line px-3 py-1.5 text-sm text-ink transition hover:border-teal/50 disabled:opacity-50"
             >
               {liveBusy ? "Measuring…" : "Measure again"}
             </button>
@@ -456,23 +636,28 @@ export default function App() {
               ["p95", load.p95_ms],
               ["p99", load.p99_ms],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-line bg-bg px-4 py-3">
+              <div key={label} className="rounded-xl border border-line bg-bg px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-muted">{label}</p>
                 <p className="tabular mt-1 font-mono text-2xl">{msLabel(value)}</p>
               </div>
             ))}
           </div>
           <p className="mt-3 text-xs text-muted">
-            n = {load.n}. {liveLoad ? "This panel is a live remeasure." : "This panel is the benchmark sample."} HydraDB round-trip time is not in this file.
+            n = {load.n}
+            {load.clients ? ` · ${load.clients} clients` : ""}. {liveLoad ? "This panel is a live remeasure." : "This panel is the benchmark sample."}
           </p>
         </Card>
       </main>
-      <footer className="mx-auto max-w-6xl px-4 pb-8 text-xs leading-5 text-muted">
-        Source noise is synthetic. The 3-hop chain names the true owner {pct(results.noise?.chain_p_true?.long)} of the time, the short trap {pct(results.noise?.chain_p_true?.trap)}, and the other short chain {pct(results.noise?.chain_p_true?.alt)}. Iteration {results.drift_iter} exchanges the wikidata and scraper labels. DreamGraph asks HydraDB for the minimum summed-cost path. The dict learner minimizes that same sum in process
-        {results.series.dict_learner.accuracy.every((value, index) => value === results.series.dreamgraph.accuracy[index])
-          ? " and matched these accuracies."
-          : "."}{" "}
-        Unweighted never takes the 3-hop chain. {results.notes?.[1]}
+      <footer className="mx-auto flex max-w-6xl flex-col gap-2 px-4 pb-10 text-xs leading-5 text-muted">
+        <p>
+          Synthetic noise is labeled as such. The Book numbers use the gold-100 author lists from Dong, Berti-Equille, and Srivastava, cached in{" "}
+          <span className="text-ink">data/book/claims.jsonl</span>. The dict learner matches DreamGraph where both minimize the same edge-cost sum. HydraDB is the engine that evaluates that sum on the live path.
+        </p>
+        <p>
+          <a className="text-ink underline decoration-line underline-offset-2" href={GITHUB}>
+            {GITHUB}
+          </a>
+        </p>
       </footer>
     </div>
   );

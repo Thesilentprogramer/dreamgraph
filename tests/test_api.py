@@ -47,6 +47,26 @@ def test_query_toggle_changes_the_path_on_a_disagreement():
     assert bad.status_code == 400
 
 
+def test_book_query_matches_the_in_process_sum():
+    document = client.get("/api/results").json()
+    rel = document["public"]["demo"]["questions"][0]
+    learned = client.get("/api/query", params={"rel": rel, "mode": "dreamgraph", "dataset": "book"})
+    assert learned.status_code == 200
+    body = learned.json()
+    assert body["computed"] == "hydradb"
+    assert body["procedure"] == "algo.SSpaths"
+    assert body["dataset"] == "book"
+    assert body["path"][0]["kind"] == "book"
+    assert body["path"][-1]["kind"] == "author"
+    from dreamgraph.public_world import generate_public_world
+    from dreamgraph.search import predict_relation
+
+    world = generate_public_world(document["public"]["demo"]["seed"])
+    prediction = predict_relation(world, rel, document["public"]["demo"]["costs"])
+    assert body["person"] == prediction.person
+    assert len(body["path"]) == len(prediction.path)
+
+
 def test_live_load_returns_percentiles():
     payload = client.get("/api/load", params={"live": 1}).json()
     live = payload["live"]

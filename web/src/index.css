@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-sans: "Outfit", "Segoe UI", sans-serif;
+  --font-serif: "Fraunces", Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --color-ink: #e8edf5;
-  --color-muted: #8b97a8;
-  --color-bg: #0c0e12;
-  --color-card: #14181f;
-  --color-line: #2a3140;
+  --color-ink: #e7edf5;
+  --color-muted: #93a0b5;
+  --color-bg: #090b10;
+  --color-card: #121722;
+  --color-line: #263044;
   --color-accent: #e2a15a;
   --color-teal: #3cbfa8;
-  --color-danger: #e15d5d;
+  --color-danger: #f07178;
 }
 
 html,
@@ -21,11 +22,54 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-bg);
+  background:
+    radial-gradient(900px 420px at 10% -10%, rgba(60, 191, 168, 0.16), transparent 55%),
+    radial-gradient(700px 380px at 90% 0%, rgba(226, 161, 90, 0.12), transparent 50%),
+    var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+.rise {
+  animation: rise 0.55s ease both;
+}
+
+.path-node {
+  animation: rise 0.45s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.card {
+  border: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-card) 92%, transparent);
+  border-radius: 16px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-teal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .path-node {
+    animation: none;
+  }
 }
