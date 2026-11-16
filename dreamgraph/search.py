@@ -82,6 +82,37 @@ def cheapest_owner(
     return Prediction(person, chosen[1], sources, chosen[0])
 
 
+def one_hop_owner(world: World, rel_id: int, costs: dict[str, float] | None) -> Prediction:
+    """Pick the chain whose first edge is cheapest, then follow that chain.
+
+    This is a lookup on one edge. It does not sum the path and it does not
+    call ``algo.SSpaths``. Ties break on the path's node-id tuple, same as
+    the full search.
+    """
+
+    best_key: tuple[float, tuple[int, ...]] | None = None
+    best: Prediction | None = None
+    for chain in world.chains[rel_id]:
+        first = world.edges[chain.edge_indexes[0]]
+        step = 1.0 if costs is None else float(costs[first.source])
+        if step <= 0:
+            raise ValueError("edge cost must stay positive; gold edges are not pinned")
+        nodes = [first.src]
+        sources = []
+        for index in chain.edge_indexes:
+            edge = world.edges[index]
+            nodes.append(edge.dst)
+            sources.append(edge.source)
+        path = tuple(nodes)
+        key = (step, path)
+        if best_key is None or key < best_key:
+            best_key = key
+            best = Prediction(chain.person, path, tuple(sources), step)
+    if best is None:
+        return Prediction(None, (world.leaf[rel_id],), (), float("inf"))
+    return best
+
+
 def predict_relation(world: World, rel_id: int, costs: dict[str, float] | None) -> Prediction:
     prediction = cheapest_owner(world.edges, world.leaf[rel_id], world.persons, costs)
     return prediction

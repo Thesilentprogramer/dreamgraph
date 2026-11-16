@@ -75,6 +75,10 @@ class World:
     heldout_rels: list[int]
     drifted: bool = False
     birth_source: dict[int, str] = field(default_factory=dict)
+    # Poison is off unless a scenario sets it. It flips reviewer feedback on
+    # train relations only. Endpoints and held-out gold do not move.
+    poison_source: str | None = None
+    poison_false_friend: str | None = None
 
     def edges_as_dicts(self) -> list[dict]:
         return [edge.as_dict() for edge in self.edges]
@@ -199,15 +203,39 @@ def apply_drift(world: World, min_rel: int = DRIFT_MIN_REL) -> dict[str, int]:
     return {"wikidata_to_scraper": wiki, "scraper_to_wikidata": scraper, "already": 0}
 
 
+def world_sources(world: World) -> tuple[str, ...]:
+    """Source labels in first-seen order. Empty worlds fall back to the defaults."""
+
+    found: list[str] = []
+    seen: set[str] = set()
+    for edge in world.edges:
+        if edge.source not in seen:
+            seen.add(edge.source)
+            found.append(edge.source)
+    return tuple(found)
+
+
 def edge_feedback(world: World, rel_id: int) -> list[tuple[str, bool]]:
-    """Current label of each edge, and whether its chain names the true owner."""
+    """Current label of each edge, and whether its chain names the true owner.
+
+    When ``poison_source`` is set, train relations report that source as wrong
+    and ``poison_false_friend`` as right. Held-out relations stay factual.
+    The edges themselves are not rewritten.
+    """
 
     gold = world.gold[rel_id]
+    poisoned = world.poison_source is not None and rel_id in world.train_rels
     rows = []
     for chain in world.chains[rel_id]:
         correct = chain.person == gold
         for index in chain.edge_indexes:
-            rows.append((world.edges[index].source, correct))
+            source = world.edges[index].source
+            bit = correct
+            if poisoned and source == world.poison_source:
+                bit = False
+            elif poisoned and world.poison_false_friend and source == world.poison_false_friend:
+                bit = True
+            rows.append((source, bit))
     return rows
 
 

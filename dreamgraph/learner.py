@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dreamgraph.config import GUARD, SOURCES, WINDOW
-from dreamgraph.world import World, edge_feedback
+from dreamgraph.config import GUARD, WINDOW
+from dreamgraph.world import World, edge_feedback, world_sources
 
 
 @dataclass
@@ -22,8 +22,19 @@ class PolicyVersion:
     reason: str
     window: int
     guard_accuracy: float | None
+    guard_before: float | None = None
+    guard_after: float | None = None
+    heldout_before: float | None = None
+    heldout_after: float | None = None
+    proposed_costs: dict[str, float] | None = None
 
     def as_dict(self) -> dict:
+        def _round(value: float | None) -> float | None:
+            return None if value is None else round(value, 6)
+
+        proposed = None
+        if self.proposed_costs is not None:
+            proposed = {key: round(value, 6) for key, value in self.proposed_costs.items()}
         return {
             "version": self.version,
             "iteration": self.iteration,
@@ -32,7 +43,12 @@ class PolicyVersion:
             "rolled_back": self.rolled_back,
             "reason": self.reason,
             "window": self.window,
-            "guard_accuracy": None if self.guard_accuracy is None else round(self.guard_accuracy, 6),
+            "guard_accuracy": _round(self.guard_accuracy),
+            "guard_before": _round(self.guard_before),
+            "guard_after": _round(self.guard_after),
+            "heldout_before": _round(self.heldout_before),
+            "heldout_after": _round(self.heldout_after),
+            "proposed_costs": proposed,
         }
 
 
@@ -46,17 +62,20 @@ def refit_costs(questions: list[int], world: World) -> dict[str, float]:
     """Laplace-smoothed cost. Higher means the label was wrong more often.
 
     Every cost is strictly positive. Nothing in here writes a graph edge.
+    Sources come from the world, so a public graph is not stuck on the
+    synthetic vendor names.
     """
 
-    good = {source: 0 for source in SOURCES}
-    bad = {source: 0 for source in SOURCES}
+    sources = world_sources(world)
+    good = {source: 0 for source in sources}
+    bad = {source: 0 for source in sources}
     for rel_id in questions:
         for source, correct in edge_feedback(world, rel_id):
             if correct:
                 good[source] += 1
             else:
                 bad[source] += 1
-    costs = {source: (bad[source] + 1.0) / (good[source] + 1.0) for source in SOURCES}
+    costs = {source: (bad[source] + 1.0) / (good[source] + 1.0) for source in sources}
     if any(cost <= 0 for cost in costs.values()):
         raise RuntimeError("refit produced a non-positive cost")
     return costs
@@ -72,8 +91,16 @@ def refit_costs_from_dicts(
     Each chain dict has ``sources`` (current labels, one per edge) and ``person``.
     """
 
-    good = {source: 0 for source in SOURCES}
-    bad = {source: 0 for source in SOURCES}
+    sources: list[str] = []
+    seen: set[str] = set()
+    for chain_list in chains.values():
+        for chain in chain_list:
+            for source in chain["sources"]:
+                if source not in seen:
+                    seen.add(source)
+                    sources.append(source)
+    good = {source: 0 for source in sources}
+    bad = {source: 0 for source in sources}
     for rel_id in questions:
         for chain in chains[rel_id]:
             correct = chain["person"] == gold[rel_id]
@@ -82,7 +109,7 @@ def refit_costs_from_dicts(
                     good[source] += 1
                 else:
                     bad[source] += 1
-    return {source: (bad[source] + 1.0) / (good[source] + 1.0) for source in SOURCES}
+    return {source: (bad[source] + 1.0) / (good[source] + 1.0) for source in sources}
 
 
 def policy_accuracy(questions: list[int], world: World, costs: dict[str, float]) -> float:
@@ -115,16 +142,17 @@ def consider_update(
         fit_on = sliced
         guard_on = []
     proposed = refit_costs(fit_on, world)
-    guard_acc = policy_accuracy(guard_on, world, proposed) if guard_on else None
+    proposed_acc = policy_accuracy(guard_on, world, proposed) if guard_on else None
     current_acc = policy_accuracy(guard_on, world, current) if guard_on else None
     rolled_back = False
     reason = "accepted"
     chosen = proposed
-    if guard_on and guard_acc is not None and current_acc is not None and guard_acc < current_acc:
+    reported_acc = proposed_acc
+    if guard_on and proposed_acc is not None and current_acc is not None and proposed_acc < current_acc:
         rolled_back = True
         reason = "guard accuracy fell"
         chosen = dict(current)
-        guard_acc = current_acc
+        reported_acc = current_acc
     snapshot = PolicyVersion(
         version=version,
         iteration=iteration,
@@ -133,6 +161,9 @@ def consider_update(
         rolled_back=rolled_back,
         reason=reason,
         window=len(sliced),
-        guard_accuracy=guard_acc,
+        guard_accuracy=reported_acc,
+        guard_before=current_acc,
+        guard_after=proposed_acc,
+        proposed_costs=dict(proposed),
     )
     return chosen, snapshot

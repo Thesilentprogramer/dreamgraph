@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from dreamgraph.config import SOURCES
 from dreamgraph.hydra_client import (
     HttpTransport,
     HydraClient,
@@ -25,10 +24,16 @@ class HydraGraph:
     def __init__(self, base_url: str, token: str):
         self.client = HydraClient(HttpTransport(base_url, token))
 
-    def load(self, world: World) -> None:
-        """MERGE every edge, then SET source and cost so a re-load updates labels."""
+    def load(self, world: World, rel_ids: set[int] | None = None) -> None:
+        """MERGE every edge, then SET source and cost so a re-load updates labels.
+
+        ``rel_ids`` limits the write to one question so a live query can bring
+        in a handful of edges without reloading the demo world.
+        """
 
         for edge in world.edges:
+            if rel_ids is not None and edge.rel_id not in rel_ids:
+                continue
             self.client.query(
                 "MERGE (a:Entity {id: $src})-[:OWNS {rel_id: $rel, hop: $hop, source: $source, cost: 1.0}]->(b:Entity {id: $dst})",
                 {
@@ -52,10 +57,13 @@ class HydraGraph:
             )
 
     def stamp_source_costs(self, costs: dict[str, float]) -> None:
-        for source in SOURCES:
+        for source, cost in costs.items():
+            weight = float(cost)
+            if weight <= 0:
+                raise ValueError("edge cost must stay positive; gold edges are not pinned")
             self.client.query(
                 "MATCH (a:Entity)-[r:OWNS]->(b:Entity) WHERE r.source = $source SET r.cost = $cost",
-                {"source": source, "cost": round(float(costs[source]), 5)},
+                {"source": source, "cost": round(weight, 5)},
             )
 
     def swap_drift_labels(self, rel_ids: list[int]) -> None:
