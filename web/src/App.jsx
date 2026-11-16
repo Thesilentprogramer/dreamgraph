@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import Chart, { LABELS } from "./Chart.jsx";
+
+const Explorer = lazy(() => import("./explorer/Explorer.jsx"));
 
 const GITHUB = "https://github.com/Thesilentprogramer/dreamgraph";
 
@@ -79,6 +81,7 @@ export default function App() {
   const [liveLoad, setLiveLoad] = useState(null);
   const [liveBusy, setLiveBusy] = useState(false);
   const [engine, setEngine] = useState(null);
+  const [screen, setScreen] = useState("dash");
 
   useEffect(() => {
     let cancelled = false;
@@ -292,6 +295,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
+      {screen === "graph" && (
+        <Suspense fallback={<div className="fixed inset-0 z-40 bg-[#0a0a0a] p-8 text-sm text-white">Loading the 3D graph…</div>}>
+          <Explorer onClose={() => setScreen("dash")} />
+        </Suspense>
+      )}
       <header className="border-b border-line/80">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -308,6 +316,13 @@ export default function App() {
             <Pill tone={results.hydra_verified ? "ok" : "warn"}>
               {results.hydra_verified ? "Benchmark on HydraDB" : "Benchmark unverified"}
             </Pill>
+            <button
+              type="button"
+              onClick={() => setScreen("graph")}
+              className="rounded-full border border-line px-3 py-1 text-xs text-ink transition hover:border-teal/50"
+            >
+              3D graph
+            </button>
             <a
               href={GITHUB}
               className="rounded-full border border-line px-3 py-1 text-xs text-ink transition hover:border-teal/50"
