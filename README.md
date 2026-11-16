@@ -8,7 +8,7 @@ DreamGraph picks a beneficial-owner path through a multi-vendor entity graph, th
 
 The numbers below are copied from [`results/summary.json`](results/summary.json) and the evidence files next to it (`results/public_summary.json`, `results/poison.json`, `results/one_hop.json`, `results/hypotheses.json`). They are not typed in by hand. `python -m dreamgraph.evidence` rebuilds the book slice, the 1-hop replay, the poison scenario, and the PASS/FAIL lines. `DG_BACKEND=hydradb python -m dreamgraph.bench` is what produced the synthetic HydraDB series; the evidence step does not overwrite those accuracies.
 
-There are two datasets. The ownership gadgets are **synthetic**: each company has a 3-hop chain that names the true owner 90% of the time, a 2-hop trap that is right 20% of the time, and another 2-hop chain that is right 45% of the time. The second set is real: three booksellers listing the same ISBNs, scored against the 100-book gold author lists. There is no live corporate registry in this repo.
+There are two datasets. The ownership gadgets are **synthetic**: each company has a 3-hop chain that names the true owner 90% of the time, a 2-hop trap that is right 20% of the time, and another 2-hop chain that is right 45% of the time. The second set is real vulnerability intel: Zenodo 16440960 gold tags, scored against NVD ranges and OSV distro feeds. There is no live corporate registry in this repo.
 
 The chart is a **precomputed export**. The benchmark wrote the document through moto and copied that object to `results/summary.json`. The query box does not read a stored answer. It calls `algo.SSpaths` on the running node.
 
@@ -44,27 +44,50 @@ Same learned costs, four ways of spending them. Final iteration, synthetic owner
 
 1-hop final 95% interval **42.6–48.9**. With uniform costs the 1-hop node-id tie-break happens to select the long chain, so it starts at 90.6 while the full sum, which counts hops, starts at 20.7. After the labels move, summing the whole path is what recovers. The 1-hop lookup stays on the short chain at 45.9. The dict learner matches because it computes that same path-cost sum in process. The contribution is the learned edge cost that HydraDB's weighted search consumes, not a private objective.
 
-### Book sellers
+### Vulnerability feeds
 
-Public slice of the Book data set (Yin, Han, and Yu, TKDE 2008, claims; Dong, Berti-Equille, and Srivastava, VLDB 2009, gold author lists from book covers). Cached at `data/book/claims.jsonl`. Checksums and the regenerate command are in `data/book/PROVENANCE.md`. Three sellers with at least two listings on a gold ISBN: **Revaluation Books**, **The Book Depository**, **textbooksNow**. 55 books. Each seed holds out 30 and trains on 25, resampled with the same window (100), guard (20), batch (40), and 8 iterations. Bootstrap 95% intervals, seeds 0, 1, and 2.
+Question: is upstream tag V of project P affected by CVE-X? Gold is Zenodo record 16440960 (CC BY 4.0), the manual affected-tag lists. A tag that appears for that repository in the gold file and is not in the CVE's affected list is not-affected. Feeds are NVD CPE ranges from the CVE-to-OSV conversion, plus OSV dumps for Debian, Alpine, Red Hat, Linux, AlmaLinux, openSUSE, SUSE, Mageia, and Rocky Linux. The processed slice is `data/vuln/claims.jsonl` (1,817 questions, 500 train / 1,317 held out per seed). Regenerate with `python scripts/fetch_vuln.py`. See `data/README.md`.
 
-Descriptive accuracy on the full slice, not used as a feature: Revaluation Books 96.4% (53/55), The Book Depository 62.5% (25/40), textbooksNow 38.1% (8/21). A claim matches gold when token Jaccard is at least 0.5.
-
-Each seller is a 2-edge chain, book → listing → author. Both edges carry that seller's cost, and the length does not depend on being right. Held-out accuracy, percent:
+Drift is **real**. Questions are ordered by the newest feed `modified` time. From the older half of the slice to the newer half, NVD's accuracy rises by 0.10 and SUSE's falls by 0.10 (also Mageia −0.09, openSUSE −0.07, Rocky −0.08). No simulated label swap is applied on this run. Each feed is a two-edge chain, question → claim → verdict, so 1-hop lookup and the full sum rank the same feed. Held-out accuracy, percent:
 
 | Method | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| DreamGraph | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| Dict learner | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| 1-hop lookup | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| Unweighted | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| Hand-set costs | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| One-shot fit | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| Greedy online | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| Frozen after 3 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 | 96.7 |
-| BM25 labels | 78.9 | 78.9 | 78.9 | 78.9 | 78.9 | 78.9 | 78.9 | 78.9 |
+| DreamGraph | 64.1 | 62.4 | 61.9 | 62.6 | 62.5 | 64.2 | 64.6 | 65.0 |
+| Dict learner | 64.1 | 62.4 | 61.9 | 62.6 | 62.5 | 64.2 | 64.6 | 65.0 |
+| 1-hop lookup | 64.1 | 62.4 | 61.9 | 62.6 | 62.5 | 64.2 | 64.6 | 65.0 |
+| NVD only | 64.9 | 64.9 | 64.9 | 64.9 | 64.9 | 64.9 | 64.9 | 64.9 |
+| Hand-set costs | 65.0 | 65.0 | 65.0 | 65.0 | 65.0 | 65.0 | 65.0 | 65.0 |
+| BM25 labels | 64.5 | 64.5 | 64.5 | 64.5 | 64.5 | 64.5 | 64.5 | 64.5 |
+| Greedy online | 64.1 | 62.8 | 56.0 | 61.8 | 62.2 | 58.8 | 64.7 | 64.6 |
+| Unweighted | 64.1 | 64.1 | 64.1 | 64.1 | 64.1 | 64.1 | 64.1 | 64.1 |
+| Frozen after 3 | 64.1 | 62.4 | 61.9 | 62.6 | 62.6 | 62.6 | 62.6 | 62.6 |
+| One-shot fit | 64.1 | 62.4 | 62.4 | 62.4 | 62.4 | 62.4 | 62.4 | 62.4 |
+| Majority vote | 59.5 | 59.5 | 59.5 | 59.5 | 59.5 | 59.5 | 59.5 | 59.5 |
+| GHSA only | 50.8 | 50.8 | 50.8 | 50.8 | 50.8 | 50.8 | 50.8 | 50.8 |
 
-DreamGraph's final mean is 96.7%, interval **92.2–100.0**. It ties unweighted, the 1-hop lookup, the dict learner, the hand-set volume prior, greedy, and the frozen model. Listing node ids follow alphabetical seller order, so an unweighted tie-break already selects Revaluation Books whenever that seller listed the book, and Revaluation listed every book in the slice. The learned costs still recover the ranking: mean final cost 0.041 for Revaluation Books, 0.839 for The Book Depository, 1.545 for textbooksNow. Seed 2 swaps the middle two (textbooksNow 0.600, The Book Depository 0.671) and still keeps Revaluation cheapest. BM25, whose query tokens do not name any of these sellers, tie-breaks on author-node id and finishes at 78.9% (interval 71.1–86.7). These book accuracies are the in-process sum. The live query box runs the same costs through `algo.SSpaths`.
+DreamGraph's final mean is 65.0%, interval **63.5–66.5**. Majority vote is 59.5% (interval 57.9–60.9). NVD alone is 64.9% (interval 63.4–66.5). Unweighted is 64.1% (interval 62.6–65.6). The intervals for DreamGraph, NVD-only, the volume prior, and unweighted overlap. The clear gap is against majority, which lets the noisier distros outvote NVD. GHSA is 50.8% because the GitHub Advisory API returned these CVEs with no package version ranges, so that baseline abstains and is scored as not-affected. These accuracies are the in-process sum. The live query box runs the same costs through `algo.SSpaths`.
+
+Learned cost against measured accuracy on the slice (lower cost means more trust). The Linux OSV feed is perfect on 74 judgments and is not a broad voter.
+
+| Feed | Learned cost | Accuracy | n |
+|---|---:|---:|---:|
+| linux | 0.039 | 100.0 | 74 |
+| nvd | 0.346 | 65.6 | 1745 |
+| alpine | 0.498 | 67.9 | 1195 |
+| debian | 0.962 | 57.8 | 1716 |
+| suse | 1.111 | 54.1 | 1537 |
+| opensuse | 1.170 | 55.7 | 1642 |
+| mageia | 1.232 | 55.0 | 863 |
+| redhat | 1.267 | 51.0 | 784 |
+| alma | 1.559 | 49.4 | 622 |
+| rocky | 2.059 | 46.4 | 569 |
+| nvd_mirror | 2.954 | 34.4 | 1745 |
+
+`nvd_mirror` is a modeled aggregator that publishes the opposite of NVD's verdict. It is not a downloaded feed. Spearman correlation of learned cost with error rate is 0.96.
+
+### NVD mirror, and the guard
+
+From iteration 4, training reviews treat NVD as always wrong and `nvd_mirror` as always right. Held-out edges stay as built. 11 rollbacks: 5 on seed 0, 6 on seed 1, and **none on seed 2**. Seed 0 iteration 4: guard 60% → 45%, held-out 65.0% → 35.9%, reason `guard accuracy fell`. Because seed 2 accepted the poisoned update, DreamGraph's mean falls to 54.7% (interval 53.2–56.2) while naive ends at 35.1% (interval 33.5–36.6) and the model frozen after iteration 3 stays at 65.1% (interval 63.6–66.6). Hypothesis H12 records that gap as **FAIL**: the frozen model finishes 0.10 above DreamGraph. The guard fired 11 times. It did not fire for every seed.
 
 ### Poison, and the guard that fires
 
@@ -91,12 +114,15 @@ Pre-registered in `dreamgraph/hypotheses.py`. `results/hypotheses.json` is the e
 | H1 | PASS | Synthetic full path beats 1-hop by 0.4467 at iteration 8 |
 | H2 | PASS | Published 3-hop rate beats unweighted by 1.00 |
 | H3 | PASS | Dict learner matches published DreamGraph, max abs diff 0 |
-| H4 | PASS | Book costs: Revaluation Books 0.041 vs textbooksNow 1.545 |
-| H5 | PASS | Book dict learner matches DreamGraph, max abs diff 0 |
-| H6 | PASS | Book final accuracy 0.9667 |
-| H7 | PASS | 15 rollbacks, and naive finishes 0.4467 below DreamGraph |
-| H8 | PASS | All 15 receipts are well-formed |
-| H9 | PASS | Frozen-after-3 ties DreamGraph on the poison run |
+| H4 | PASS | Vuln Spearman of cost vs error 0.9636 |
+| H5 | PASS | Vuln dict learner matches DreamGraph, max abs diff 0 |
+| H6 | PASS | Vuln DreamGraph exceeds majority by 0.0549 |
+| H7 | PASS | Synthetic poison: 15 rollbacks, naive 0.4467 below DreamGraph |
+| H8 | PASS | All 15 synthetic receipts are well-formed |
+| H9 | PASS | Frozen-after-3 ties DreamGraph on the synthetic poison run |
+| H10 | PASS | NVD-mirror poison: 11 rollbacks, naive 0.1962 below DreamGraph |
+| H11 | PASS | All 11 vulnerability receipts are well-formed |
+| H12 | FAIL | Frozen model beats DreamGraph by 0.1035 on the NVD-mirror run |
 
 Concurrent load, 20 clients, 30 weighted `algo.SSpaths` calls each (n = 600): p50 **6.33 ms**, p95 **12.56 ms**, p99 **15.88 ms**. Those are engine round trips.
 
@@ -206,8 +232,8 @@ Not from a local `docker image inspect`. Re-check after a pull.
 - The world is disjoint competing chains, not a shared corporate registry. People are not reused across companies.
 - Source noise is a fixed coin flip per chain, not a scrape.
 - The dict learner ties DreamGraph because both minimize the same edge-cost sum. HydraDB is what evaluated that sum for every DreamGraph answer in the synthetic file. The tie is the measurement. Unweighted search, which does not, never selects the 3-hop chain. The 1-hop lookup, which spends only the first edge, finishes at 45.9% after recovery.
-- On the Book slice the unweighted tie-break already selects the best seller, so learned costs do not raise accuracy. They do rank Revaluation Books below textbooksNow. Seed 2 swaps the middle two sellers.
-- The poison guard fires 15 times. A model frozen before the poison also survives. H9 says so.
+- On the vulnerability slice DreamGraph finishes at 65.0%, ahead of majority (59.5%) and essentially tied with NVD-only (64.9%). The intervals overlap unweighted. Learned costs still rank the feeds with the measured error rates (Spearman 0.96).
+- The NVD-mirror guard rolls back 11 times and misses seed 2. H12 is FAIL: the frozen model ends higher. The synthetic poison guard still rolls back 15 times.
 - `pathCount` is still sized as a total cap. On a single source the probe's `pathCount: 2` returned 2 rows. That does not separate a per-pair reading from a total cap. The client sets `resultLimit` to the same total anyway.
 - Greedy only partly recovers on the label swap. The window is what puts the 3-hop rate back to 1.00. The drift run's guard did not fire. The poison run rolls back 15 times.
 - Latency will move if you re-time it. The accuracy series will not, for these seeds.
