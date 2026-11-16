@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Chart from "./Chart.jsx";
+import { navigate } from "./route.js";
 
 const GITHUB = "https://github.com/Thesilentprogramer/dreamgraph";
 
@@ -86,7 +87,7 @@ export default function Landing() {
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 28 }}>
           <a className="sq sq-invert" href="/dashboard">See the live dashboard</a>
-          <a className="sq" href="/graph">Open the 3D graph</a>
+          <a className="sq" href="/graph" onClick={(event) => { event.preventDefault(); navigate("/graph"); }}>Open the 3D graph</a>
           <a className="sq" href={GITHUB}>Get the GitHub repo</a>
         </div>
         {error && <p className="meta" style={{ marginTop: 16 }}>{error}</p>}
@@ -228,7 +229,7 @@ export default function Landing() {
             The graph lives in HydraDB OSS. DreamGraph writes a cost on each claim edge and reads the verdict paths back from algo.SPpaths. The learner does not pin a gold edge to zero.
           </p>
           <p style={{ marginTop: 20 }}>
-            <a className="sq" href="/graph" style={{ background: "#d6ff4a" }}>Open the 3D graph</a>
+            <a className="sq" href="/graph" style={{ background: "#d6ff4a" }} onClick={(event) => { event.preventDefault(); navigate("/graph"); }}>Open the 3D graph</a>
           </p>
         </div>
       </section>

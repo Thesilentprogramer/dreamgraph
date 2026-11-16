@@ -3,6 +3,14 @@ import ForceGraph3D from "react-force-graph-3d";
 import * as THREE from "three";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 
+// three r181 dropped Object3D.intersectsFrustum. A second, older Three copy
+// inside the force-graph renderer still calls it and blanks the canvas.
+if (typeof THREE.Object3D.prototype.intersectsFrustum !== "function") {
+  THREE.Object3D.prototype.intersectsFrustum = function intersectsFrustum() {
+    return true;
+  };
+}
+
 const BLUE = "#070EF4";
 
 const TYPE_LABEL = {
@@ -78,6 +86,7 @@ function makeLabel(node) {
   node.__label = el;
   const object = new CSS2DObject(el);
   object.visible = false;
+  object.frustumCulled = false;
   object.position.set(0, radiusOf(node, {}) + 1.4, 0);
   node.__css = object;
   return object;
@@ -96,6 +105,9 @@ function sphereFor(node, costs) {
   );
   node.__mesh = mesh;
   node.__wire = wire;
+  mesh.frustumCulled = false;
+  wire.frustumCulled = false;
+  group.frustumCulled = false;
   group.add(mesh);
   group.add(wire);
   group.add(makeLabel(node));
@@ -566,9 +578,10 @@ export default function Explorer({ onClose }) {
       {error && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 text-sm text-[#f07178]">{error}</p>}
       {!webgl && (
         <div className="absolute inset-0 z-10 flex items-center justify-center p-8 text-center">
-          <div className="max-w-md rounded-2xl border border-white/10 bg-black/80 p-6">
-            <p className="font-serif text-2xl">WebGL is not available</p>
-            <p className="mt-2 text-sm text-white/70">The 3D explorer needs a WebGL context. The rest of the dashboard still works, and the graph JSON is served at /api/explorer.</p>
+          <div className="nb max-w-md p-6">
+            <p className="display text-4xl">WebGL is not available</p>
+            <p className="mt-3 text-sm">This browser cannot start a WebGL context, so the spheres stay hidden. The dashboard still works, and the graph JSON is at /api/explorer.</p>
+            <a className="sq mt-4" href="/dashboard">See the live dashboard</a>
           </div>
         </div>
       )}
