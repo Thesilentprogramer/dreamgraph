@@ -16,28 +16,30 @@ The live API checks tags in the bundled Zenodo slice using HydraDB's weighted `a
 
 ```bash
 curl -G 'https://dreamgraph.onrender.com/api/verdict' \
-  --data-urlencode 'cve=CVE-2023-3745' \
-  --data-urlencode 'package=ImageMagick' \
-  --data-urlencode 'version=7.0.11-1'
+  --data-urlencode 'cve=CVE-2022-4304' \
+  --data-urlencode 'package=openssl' \
+  --data-urlencode 'version=OpenSSL_1_1_1t'
 ```
 
 An abridged response has this shape (the live path costs and vote share are calculated on request):
 
 ```json
 {
-  "cve": "CVE-2023-3745",
-  "package": "ImageMagick",
-  "version": "7.0.11-1",
-  "verdict": "affected",
-  "confidence": 1.0,
-  "trust_paths": [{"feed": "nvd", "trust_cost": 0.532, "path_cost": 1.064, "claim": "affected", "in_vote": true}],
-  "policy_version": 7,
+  "cve": "CVE-2022-4304",
+  "package": "openssl",
+  "version": "OpenSSL_1_1_1t",
+  "verdict": "not_affected",
+  "trust_paths": [
+    {"feed": "nvd", "claim": "not_affected", "in_vote": true},
+    {"feed": "debian", "claim": "affected", "in_vote": false}
+  ],
   "gold_label": "not_affected",
+  "engine": "hydradb-live",
   "procedure": "algo.SPpaths"
 }
 ```
 
-`confidence` is the winning share of `exp(-path cost)` votes among the top five paths within 0.15 of the cheapest, not a calibrated probability. The example above is abridged: actual responses include all returned trust paths and `confidence_note`. PolicyVersion 7 is the policy scored in the published final iteration; the subsequent fit produced version 8 after that scoring pass.
+`confidence` is the winning share of `exp(-path cost)` votes among the top five paths within 0.15 of the cheapest, not a calibrated probability. Here four of five feeds say affected, but the learned trust path picks the one that matches the reviewed label. The example above is abridged (costs omitted): actual responses include all returned trust paths and `confidence_note`. PolicyVersion 7 is the policy scored in the published final iteration; the subsequent fit produced version 8 after that scoring pass.
 
 For Claude Code, put this in `.mcp.json`; for Cursor, put the same `mcpServers` entry in `.cursor/mcp.json` (Cursor can omit `type`):
 

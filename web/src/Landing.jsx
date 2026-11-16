@@ -4,7 +4,7 @@ import { navigate } from "./route.js";
 import useResults from "./useResults.js";
 
 const GITHUB = "https://github.com/Thesilentprogramer/dreamgraph";
-const EXAMPLE = { cve: "CVE-2023-3745", package: "ImageMagick", version: "7.0.11-1" };
+const EXAMPLE = { cve: "CVE-2022-4304", package: "openssl", version: "OpenSSL_1_1_1t" };
 
 function TryIt() {
   const [fields, setFields] = useState(EXAMPLE);
