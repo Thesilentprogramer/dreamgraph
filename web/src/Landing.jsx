@@ -41,15 +41,15 @@ function TryIt() {
   const cursor = JSON.stringify({ mcpServers: { dreamgraph: { url: "https://dreamgraph.onrender.com/mcp" } } }, null, 2);
 
   return <section id="try-it" className="band-blue try-it"><div className="wrap">
-    <h2>Try a live verdict</h2>
-    <p>Check a tag from the Zenodo set. DreamGraph asks HydraDB for weighted trust paths when you submit.</p>
+    <h2>Try a verdict</h2>
+    <p>Check a tag from the Zenodo set. DreamGraph uses HydraDB when ready and replays the same weighted vote while it warms up.</p>
     <form onSubmit={check} className="try-form">
       {[["cve", "CVE"], ["package", "Package"], ["version", "Version"]].map(([key, label]) => <label key={key}>{label}<input name={key} value={fields[key]} onChange={(event) => setFields({ ...fields, [key]: event.target.value })} required maxLength={128} /></label>)}
       <button className="sq" type="submit" disabled={loading}>{loading ? "Checking…" : "Check vulnerability"}</button>
     </form>
     {error && <p className="try-error" role="alert">{error}</p>}
     {result && <div className="try-result nb" role="status">
-      <div><p className="meta">Policy version {result.policy_version} · Live HydraDB</p><h3 className="display">{result.verdict.replaceAll("_", " ")}</h3><p>Vote share: {pct(result.confidence)} · Gold label: {result.gold_label?.replaceAll("_", " ")}</p></div>
+      <div><p className="meta">Policy version {result.policy_version} · {result.engine === "hydradb-live" ? "HydraDB live" : "Offline replay"}</p><h3 className="display">{result.verdict.replaceAll("_", " ")}</h3><p>Vote share: {pct(result.confidence)} · Gold label: {result.gold_label?.replaceAll("_", " ")}</p>{result.note && <p className="try-note">{result.note}</p>}</div>
       <div><h4>Trust paths</h4><ul>{result.trust_paths.map((path, index) => <li key={`${path.feed}-${index}`}><strong>{path.feed}</strong> → {path.claim.replaceAll("_", " ")} <span>feed cost {path.trust_cost?.toFixed(3)} · path cost {path.path_cost.toFixed(3)}{path.in_vote ? " · in vote" : ""}</span></li>)}</ul></div>
       <p className="try-note">Confidence is a share of weighted path votes, not a calibrated probability.</p>
     </div>}

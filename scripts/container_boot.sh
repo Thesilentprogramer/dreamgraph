@@ -10,6 +10,7 @@ printf '%s\n' "$TOKEN" > /var/lib/dreamgraph/auth-token
 export DG_HYDRA_TOKEN="$TOKEN"
 export DG_HYDRA_URL="${DG_HYDRA_URL:-http://127.0.0.1:8443}"
 export DG_SEED_ON_BOOT="${DG_SEED_ON_BOOT:-1}"
+export DG_GRAPH_NODE_PID_FILE="${DG_GRAPH_NODE_PID_FILE:-/tmp/graph-node.pid}"
 export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-testing}"
 export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-testing}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
@@ -54,7 +55,7 @@ export GRAPH_ID=default
 export GRAPH_CELL_ID=cell-0
 export GRAPH_CELLS=cell-0
 export GRAPH_NODE_ID=node-0
-export GRAPH_BOLT_NODE_ADDRESSES=node-0=127.0.0.1:7687
+export GRAPH_BOLT_NODE_ADDRESSES=node-0=0.0.0.0:7687
 export GRAPH_ADVERTISED_BOLT_ADDR=127.0.0.1:7687
 export GRAPH_DATA_CACHE_DIR=/var/cache/slatedb
 export GRAPH_DATA_CACHE_BYTES="${GRAPH_DATA_CACHE_BYTES:-67108864}"
@@ -70,6 +71,8 @@ mkdir -p "$DG_STATE_DIR"
 python -m dreamgraph.moto_state restore || true
 
 /usr/local/bin/graph-node >/tmp/graph-node.log 2>&1 &
+GRAPH_NODE_PID=$!
+printf '%s\n' "$GRAPH_NODE_PID" > "$DG_GRAPH_NODE_PID_FILE"
 
 # Best-effort copy of the bucket. A failed snapshot must not stop the app.
 ( python -m dreamgraph.moto_state watch || true ) >/tmp/moto-state.log 2>&1 &
@@ -80,14 +83,17 @@ import urllib.request
 
 for _ in range(90):
     try:
-        with urllib.request.urlopen("http://127.0.0.1:8443/healthz", timeout=2) as response:
-            if response.status == 200:
-                raise SystemExit(0)
+        with urllib.request.urlopen("http://127.0.0.1:8443/healthz", timeout=2) as health:
+            health_ok = health.status == 200
+        with urllib.request.urlopen("http://127.0.0.1:9090/readyz", timeout=2) as ready:
+            ready_ok = ready.status == 200
+        if health_ok and ready_ok:
+            raise SystemExit(0)
     except SystemExit:
         raise
     except Exception:
         time.sleep(1)
-raise SystemExit("graph-node did not open /healthz")
+raise SystemExit("graph-node did not become healthy on :8443 and ready on :9090")
 PY
 
 exec uvicorn dreamgraph.api:app --host 0.0.0.0 --port "${PORT:-8000}"

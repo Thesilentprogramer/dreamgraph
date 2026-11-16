@@ -1,5 +1,5 @@
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from dreamgraph.api import _hydra_up, _writer_not_ready, app
 
@@ -7,9 +7,12 @@ client = TestClient(app)
 
 
 @pytest.fixture
-def live_engine():
+def live_engine(monkeypatch):
     if not _hydra_up():
         pytest.skip("HydraDB is not running on :8443; API integration needs the live engine")
+    from dreamgraph import api
+
+    monkeypatch.setitem(api._boot, "seeded", True)
 
 
 def test_seed_retries_until_the_node_owns_the_cell():
@@ -128,6 +131,7 @@ def test_verdict_known_tag_uses_weighted_vote(monkeypatch):
             return Prediction(end, (world.leaf[rel], end), (source,), 1.0), [(1.0, end, (world.leaf[rel], end), (source,))]
 
     monkeypatch.setattr(api, "_hydra_up", lambda: True)
+    monkeypatch.setitem(api._boot, "seeded", True)
     monkeypatch.setattr(api, "_ensure_vuln_edge", lambda world, rel: FakeGraph())
     response = client.get("/api/verdict", params={"cve": "CVE-2023-3745", "package": "ImageMagick", "version": "7.0.11-1"})
     assert response.status_code == 200
@@ -136,10 +140,99 @@ def test_verdict_known_tag_uses_weighted_vote(monkeypatch):
     assert body["gold_label"] == "not_affected"
     assert body["policy_version"] == 7
     assert body["procedure"] == "algo.SPpaths"
+    assert body["engine"] == "hydradb-live"
     assert body["trust_paths"][0]["trust_cost"] > 0
     assert body["trust_paths"][0]["claim"] in {"affected", "not_affected"}
     assert 0 <= body["confidence"] <= 1
     assert client.post("/api/verdict", json=[{"cve": "CVE-2023-3745", "package": "ImageMagick", "version": "7.0.11-1"}]).status_code == 200
+
+
+def test_verdict_replays_top5_vote_while_hydra_is_unseeded(monkeypatch):
+    from dreamgraph import api
+    from dreamgraph.learner import CostBook
+
+    monkeypatch.setitem(api._boot, "seeded", False)
+    monkeypatch.setattr(api, "_hydra_up", lambda: False)
+    response = client.get(
+        "/api/verdict",
+        params={"cve": "CVE-2023-3745", "package": "ImageMagick", "version": "7.0.11-1"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["engine"] == "offline-replay"
+    assert "warming up" in body["note"]
+    assert len(body["trust_paths"]) <= 5
+    assert body["procedure"] == "algo.SPpaths"
+
+    document = api.load_results()
+    demo = document["vuln"]["demo"]
+    world = api.vuln_world(document)
+    rel = next(rel for rel, leaf in world.leaf.items() if world.names[leaf] == "ImageMagick 7.0.11-1 · CVE-2023-3745")
+    pair = {}
+    for key, value in demo.get("conditional", {}).items():
+        source, _, project_name = key.partition("|")
+        pair[(source, project_name)] = float(value)
+    book = CostBook({key: float(value) for key, value in demo["costs"].items()}, pair)
+    prediction, found = api._replay_sp_paths(
+        world,
+        rel,
+        book,
+        world.projects[rel],
+        k=int(demo["vote"]["k"]),
+        margin=float(demo["vote"]["margin"]),
+    )
+    ranked = sorted(found, key=lambda item: (item[0], item[1]))[:int(demo["vote"]["k"])]
+    assert body["verdict"] == world.names[prediction.person].replace(" ", "_")
+    assert [item["path_cost"] for item in body["trust_paths"]] == [round(item[0], 6) for item in ranked]
+    assert [item["in_vote"] for item in body["trust_paths"]] == [
+        item[0] <= ranked[0][0] + float(demo["vote"]["margin"]) + 1e-9 for item in ranked
+    ]
+
+
+def test_verdict_times_out_to_offline_replay(monkeypatch):
+    import threading
+    import time
+
+    from dreamgraph import api
+
+    finished = threading.Event()
+
+    class SlowGraph:
+        def stamp_source_costs(self, costs, rel):
+            assert all(cost > 0 for cost in costs.values())
+            time.sleep(0.15)
+            finished.set()
+
+        def voted_paths(self, world, rel, *, k, margin):
+            raise AssertionError("timed-out work should not reach the vote")
+
+    monkeypatch.setitem(api._boot, "seeded", True)
+    monkeypatch.setattr(api, "_hydra_up", lambda: True)
+    monkeypatch.setattr(api, "_HYDRA_REQUEST_TIMEOUT", 0.03)
+    monkeypatch.setattr(api, "_ensure_vuln_edge", lambda world, rel: SlowGraph())
+    started = time.monotonic()
+    response = client.get(
+        "/api/verdict",
+        params={"cve": "CVE-2023-3745", "package": "ImageMagick", "version": "7.0.11-1"},
+    )
+    elapsed = time.monotonic() - started
+    assert response.status_code == 200
+    assert response.json()["engine"] == "offline-replay"
+    assert "did not finish" in response.json()["note"]
+    assert elapsed < 0.5
+    assert finished.wait(1)
+
+
+def test_query_fails_fast_before_seed(monkeypatch):
+    from dreamgraph import api
+
+    monkeypatch.setitem(api._boot, "seeded", False)
+    monkeypatch.setattr(api, "_hydra_up", lambda: True)
+    started = __import__("time").monotonic()
+    response = client.get("/api/query", params={"rel": 1000})
+    assert response.status_code == 503
+    assert "not seeded" in response.json()["detail"]
+    assert __import__("time").monotonic() - started < 0.25
 
 
 def test_verdict_unknown_tag_and_invalid_input():

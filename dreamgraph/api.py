@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import math
 import os
+import queue
 import threading
 import time
+import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,6 +21,12 @@ from dreamgraph.bench import EXPORT, percentile
 from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
 from dreamgraph.hydra_graph import HydraGraph, concurrent_latencies
 from dreamgraph.learner import CostBook
+from dreamgraph.lease_recovery import (
+    handle_writer_lease_error,
+    reset_writer_lease_state,
+    writer_lease_last_restart_error,
+    writer_lease_restart_count,
+)
 from dreamgraph.mcp import mcp
 from dreamgraph.search import Prediction
 from dreamgraph.vuln_world import generate_vuln_world
@@ -29,7 +37,45 @@ DIST = ROOT / "web" / "dist"
 
 _world_cache: dict = {}
 _load_lock = threading.Lock()
+_hydra_work_lock = threading.Lock()
+_HYDRA_REQUEST_TIMEOUT = 8.0
 _boot = {"seeding": False, "seeded": False, "error": None}
+
+
+def _bounded_hydra_call(work, timeout: float | None = None):
+    """Run one whole Hydra-backed handler operation with a hard response deadline.
+
+    A timed-out operation may still be blocked in its HTTP request. A single
+    daemon worker and non-blocking lock keep those requests from accumulating.
+    HttpTransport also has an eight-second socket timeout for normal failures.
+    """
+
+    if timeout is None:
+        timeout = _HYDRA_REQUEST_TIMEOUT
+    if not _hydra_work_lock.acquire(blocking=False):
+        raise TimeoutError("HydraDB request worker is busy")
+    result: queue.Queue = queue.Queue(maxsize=1)
+
+    def run() -> None:
+        try:
+            result.put((True, work()))
+        except Exception as exc:  # noqa: BLE001 — return handler errors to the caller
+            result.put((False, exc))
+        finally:
+            _hydra_work_lock.release()
+
+    try:
+        threading.Thread(target=run, name="dreamgraph-hydra-request", daemon=True).start()
+    except RuntimeError:
+        _hydra_work_lock.release()
+        raise
+    try:
+        succeeded, value = result.get(timeout=timeout)
+    except queue.Empty as exc:
+        raise TimeoutError("HydraDB request exceeded its deadline") from exc
+    if succeeded:
+        return value
+    raise value
 
 
 def _writer_not_ready(exc: BaseException) -> bool:
@@ -40,17 +86,21 @@ def _seed_on_boot() -> None:
     """Load the demo world once this node owns cell-0.
 
     /healthz answers before the writer lease is claimed. On a slow CPU that
-    gap is long enough for the first MERGE to fail with owner: unknown.
+    gap is long enough for the first MERGE to fail with owner: unknown. Once
+    a lease failure has occurred, keep retrying through transient restart
+    errors too; the last error remains visible on /api/health.
     """
 
     _boot["seeding"] = True
+    _boot["seeded"] = False
     _boot["error"] = None
     deadline = time.monotonic() + 300
+    lease_seen = False
     delay = 2.0
     try:
         while True:
             if not _hydra_up():
-                if time.monotonic() >= deadline:
+                if not lease_seen and time.monotonic() >= deadline:
                     _boot["error"] = "HydraDB did not open /healthz"
                     return
             else:
@@ -59,13 +109,16 @@ def _seed_on_boot() -> None:
                     world = demo_world(document)
                     graph = _ensure_loaded(world)
                     graph.stamp_source_costs(document["demo"]["costs"])
+                    reset_writer_lease_state()
                     _boot["seeded"] = True
                     _boot["error"] = None
                     return
                 except Exception as exc:  # noqa: BLE001 — surfaced on /api/health
                     _boot["error"] = str(exc)
-                    if not _writer_not_ready(exc) or time.monotonic() >= deadline:
+                    lease_error = handle_writer_lease_error(exc)
+                    if not lease_error and not lease_seen:
                         return
+                    lease_seen = lease_seen or lease_error
             threading.Event().wait(delay)
             delay = min(delay * 1.5, 15.0)
     finally:
@@ -137,7 +190,7 @@ def _hydra_up() -> bool:
     try:
         with urllib.request.urlopen(f"{HYDRA_URL}/healthz", timeout=2) as response:
             return response.status == 200
-    except Exception:
+    except (OSError, TimeoutError, urllib.error.URLError):
         return False
 
 
@@ -156,7 +209,6 @@ def _ensure_loaded(world: World) -> HydraGraph:
         if _world_cache.get("loaded") != key:
             graph.load(world)
             _world_cache["loaded"] = key
-            _boot["seeded"] = True
     return graph
 
 
@@ -210,6 +262,40 @@ def _path_payload(world, rel_id: int, mode: str, costs: dict | None, prediction:
     }
 
 
+def _replay_sp_paths(world: World, rel_id: int, book: CostBook, project: str, *, k: int, margin: float):
+    """Replay the per-verdict SPpaths calls over the in-process gadget graph.
+
+    HydraDB is asked for up to ``k`` paths to each distinct verdict, then the
+    vote is made from the globally cheapest ``k`` returned paths. Keeping those
+    two ranking stages reproduces the live SPpaths-margin behavior.
+    """
+
+    from dreamgraph.search import combine_ends
+
+    per_target: dict[int, list[tuple[float, int, tuple[int, ...], tuple[str, ...]]]] = {}
+    for chain in world.chains.get(rel_id, []):
+        nodes = [world.edges[chain.edge_indexes[0]].src]
+        sources: list[str] = []
+        weight = 0.0
+        for index in chain.edge_indexes:
+            edge = world.edges[index]
+            sources.append(edge.source)
+            nodes.append(edge.dst)
+            weight += book.weight(edge.source, project)
+        per_target.setdefault(chain.person, []).append(
+            (weight, chain.person, tuple(nodes), tuple(sources))
+        )
+
+    found = []
+    for candidates in per_target.values():
+        found.extend(sorted(candidates, key=lambda item: (item[0], item[2]))[:k])
+    chosen, _weight = combine_ends([(item[0], item[1]) for item in found], k=k, margin=margin)
+    if chosen is None:
+        return Prediction(None, (world.leaf[rel_id],), (), float("inf")), found
+    match = min((item for item in found if item[1] == chosen), key=lambda item: (item[0], item[2]))
+    return Prediction(match[1], match[2], match[3], match[0]), found
+
+
 @app.get("/healthz")
 def healthz():
     """Render health check. 200 only after HydraDB itself answers."""
@@ -221,6 +307,8 @@ def healthz():
         "live_engine": up,
         "seeded": _boot["seeded"],
         "seeding": _boot["seeding"],
+        "restart_count": writer_lease_restart_count(),
+        "lease_restart_error": writer_lease_last_restart_error(),
     }
     if not up:
         return JSONResponse(body, status_code=503)
@@ -239,6 +327,8 @@ def health() -> dict:
         "seeded": _boot["seeded"],
         "seeding": _boot["seeding"],
         "seed_error": _boot["error"],
+        "restart_count": writer_lease_restart_count(),
+        "lease_restart_error": writer_lease_last_restart_error(),
     }
 
 
@@ -273,15 +363,13 @@ class VerdictRequest(BaseModel):
     version: str = Field(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._+~:-]*$", examples=["7.0.11-1"])
 
 
-def _verdict(request: VerdictRequest) -> dict:
+def _verdict(request: VerdictRequest, *, force_offline: bool = False) -> dict:
     document = load_results()
     world = vuln_world(document)
     wanted = f"{request.package} {request.version} · {request.cve}".casefold()
     rel = next((rel for rel, leaf in world.leaf.items() if world.names[leaf].casefold() == wanted), None)
     if rel is None:
         raise HTTPException(status_code=404, detail="Tag is not in the Zenodo graph")
-    if not _hydra_up():
-        raise HTTPException(status_code=503, detail="HydraDB is not answering on :8443")
 
     demo = document["vuln"]["demo"]
     policies = [row for row in document["vuln"]["policies"] if row["seed"] == demo["seed"] and row["costs"] == demo["costs"]]
@@ -294,11 +382,31 @@ def _verdict(request: VerdictRequest) -> dict:
         pair[(feed, project)] = float(value)
     book = CostBook({feed: float(cost) for feed, cost in demo["costs"].items()}, pair)
     project = world.projects[rel]
-    graph = _ensure_vuln_edge(world, rel)
-    feeds = {world.edges[index].source for chain in world.chains[rel] for index in chain.edge_indexes}
-    graph.stamp_source_costs({feed: book.weight(feed, project) for feed in feeds}, rel)
     vote = demo["vote"]
-    prediction, found = graph.voted_paths(world, rel, k=int(vote["k"]), margin=float(vote["margin"]))
+    k, margin = int(vote["k"]), float(vote["margin"])
+    engine = "offline-replay"
+    note = "HydraDB is warming up; this verdict replays the top-5 SPpaths-margin vote in process."
+    prediction = None
+    found = None
+    if not force_offline and _boot["seeded"] and _hydra_up():
+        def live_vote():
+            graph = _ensure_vuln_edge(world, rel)
+            feeds = {world.edges[index].source for chain in world.chains[rel] for index in chain.edge_indexes}
+            graph.stamp_source_costs({feed: book.weight(feed, project) for feed in feeds}, rel)
+            return graph.voted_paths(world, rel, k=k, margin=margin)
+
+        try:
+            prediction, found = _bounded_hydra_call(live_vote)
+            engine = "hydradb-live"
+            note = "Verdict paths and margin vote were returned by live HydraDB SPpaths."
+        except TimeoutError:
+            note = "HydraDB did not finish within 8 seconds; this verdict replays the top-5 SPpaths-margin vote in process."
+        except Exception as exc:  # noqa: BLE001 — preserve availability with the exact local replay
+            note = f"HydraDB could not complete the vote ({type(exc).__name__}); this verdict replays the top-5 SPpaths-margin vote in process."
+    elif force_offline:
+        note = "This batch uses the in-process replay to keep the response bounded."
+    if prediction is None or found is None:
+        prediction, found = _replay_sp_paths(world, rel, book, project, k=k, margin=margin)
     ranked = sorted(found, key=lambda item: (item[0], item[1]))[:int(vote["k"])]
     eligible = [item for item in ranked if item[0] <= ranked[0][0] + float(vote["margin"]) + 1e-9] if ranked else []
     scores = {}
@@ -327,6 +435,8 @@ def _verdict(request: VerdictRequest) -> dict:
         "policy_version": policy["version"],
         "gold_label": world.names[world.gold[rel]].replace(" ", "_"),
         "procedure": "algo.SPpaths",
+        "engine": engine,
+        "note": note,
     }
 
 
@@ -344,7 +454,7 @@ def post_verdict(request: VerdictRequest | list[VerdictRequest]) -> dict | list[
     if isinstance(request, list):
         if not request or len(request) > 20:
             raise HTTPException(status_code=422, detail="Batch must contain 1–20 tags")
-        return [_verdict(item) for item in request]
+        return [_verdict(item, force_offline=True) for item in request]
     return _verdict(request)
 
 
@@ -363,8 +473,22 @@ def query(
         raise HTTPException(status_code=400, detail="mode must be dreamgraph or unweighted")
     if dataset not in {"synthetic", "vuln"}:
         raise HTTPException(status_code=400, detail="dataset must be synthetic or vuln")
+    if not _boot["seeded"]:
+        raise HTTPException(status_code=503, detail="HydraDB is not seeded yet")
     if not _hydra_up():
         raise HTTPException(status_code=503, detail="HydraDB is not answering on :8443")
+
+    try:
+        return _bounded_hydra_call(lambda: _query_live(rel, mode, dataset))
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="HydraDB query exceeded the 8-second request deadline") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"HydraDB query failed: {exc}") from exc
+
+
+def _query_live(rel: int, mode: str, dataset: str) -> dict:
     document = load_results()
     if dataset == "vuln":
         world = vuln_world(document)
@@ -413,8 +537,22 @@ def load(live: int = 0) -> dict:
     recorded = document["load"]
     if not live:
         return {"recorded": recorded, "live": None}
+    if not _boot["seeded"]:
+        raise HTTPException(status_code=503, detail="HydraDB is not seeded yet")
     if not _hydra_up():
         raise HTTPException(status_code=503, detail="HydraDB is not answering on :8443")
+
+    try:
+        return _bounded_hydra_call(lambda: _live_load(document, recorded))
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="Live load exceeded the 8-second request deadline") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Live load failed: {exc}") from exc
+
+
+def _live_load(document: dict, recorded: dict) -> dict:
     world = demo_world(document)
     graph = _ensure_loaded(world)
     graph.stamp_source_costs(document["demo"]["costs"])
@@ -456,7 +594,7 @@ def assets(asset_path: str):
         raise HTTPException(status_code=404, detail="not found")
     if not candidate.is_file():
         page = DIST / "index.html"
-        if page.exists() and (asset_path == "dashboard" or asset_path.startswith("dashboard/") or asset_path == "graph" or asset_path.startswith("graph/")):
+        if page.exists() and (asset_path in {"dashboard", "graph"} or asset_path.startswith(("dashboard/", "graph/"))):
             return FileResponse(page)
         if page.exists() and "." not in Path(asset_path).name:
             return FileResponse(page, status_code=404)

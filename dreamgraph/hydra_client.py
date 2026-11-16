@@ -219,7 +219,7 @@ class HydraClient:
 class HttpTransport:
     """POST a query body to a live HydraDB. Used by the probe and ``DG_BACKEND=hydradb``."""
 
-    def __init__(self, base_url: str, token: str, graph_id: str = "default", timeout: float = 30.0):
+    def __init__(self, base_url: str, token: str, graph_id: str = "default", timeout: float = 8.0):
         self.url = f"{base_url.rstrip('/')}/v1/graphs/{graph_id}/query"
         self.token = token
         self.timeout = timeout

@@ -1,4 +1,5 @@
 import uuid
+import urllib.request
 
 import pytest
 
@@ -9,6 +10,7 @@ from dreamgraph.hydra_client import (
     build_ss_paths,
     parse_path_cell,
     path_budget,
+    HttpTransport,
 )
 
 
@@ -109,3 +111,16 @@ def test_null_cell_has_no_value_key():
     )
     client = HydraClient(capture)
     assert client.rows("MATCH (n {id: 1}) RETURN n.name AS name") == [[None]]
+
+
+def test_http_transport_caps_query_timeout_at_eight_seconds(monkeypatch):
+    seen = {}
+
+    def timeout_response(_request, *, timeout):
+        seen["timeout"] = timeout
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(urllib.request, "urlopen", timeout_response)
+    with pytest.raises(TimeoutError, match="timed out"):
+        HttpTransport("http://127.0.0.1:8443", "token")({"query": "RETURN 1"})
+    assert seen["timeout"] == 8.0
