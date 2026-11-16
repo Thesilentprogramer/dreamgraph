@@ -1,47 +1,41 @@
 # Loom script — about three minutes
 
-Read it while the dashboard at `http://127.0.0.1:8000` is the only thing on screen. Do not publish this take until a live HydraDB probe has passed, or say the caveat out loud. The bracketed lines are what you click, not what you say.
+Read it while the dashboard is the only thing on screen. The bracketed lines are what you click, not what you say. Numbers are the evidence files, not a rehearsal draft.
 
-## 0:00 — The bill
+## 0:00 — The line
 
-Teams that merge KYC or B2B entity data pay when three vendors disagree about who owns a company, and someone files the wrong person. DreamGraph is the graph that keeps a cost on each vendor and changes that cost when reviewers say the path was wrong. It is a HydraDB Track 1 entry: the links are supposed to get sharper every run.
+Teams that merge entity data pay when three sources disagree and someone files the wrong person. DreamGraph keeps a cost on each source, refits it when a reviewer says the path was wrong, and asks HydraDB `algo.SSpaths` for the cheapest path. If the new costs lose on a guard slice, the policy rolls back and the receipt stays.
 
-## 0:25 — The picture
+## 0:25 — Four numbers
 
-[Point at the four numbers, then the chart.]
+[Point at the hero.]
 
-This page is one precomputed run. Three hundred held-out companies, three seeds. The noise is synthetic and labeled: before anything breaks, a Wikidata chain is right about eighty-eight percent of the time, the registry about seventy-two, the scraper about thirty. The lines are not mocked. They come from `results/summary.json`.
+Synthetic full path, iteration 8: 90.6 percent, interval 88.4 to 92.4. The 1-hop lookup that spends only the first edge's learned cost, and does not call path search, finishes at 45.9. Book sellers, 30 held-out gold books, three seeds: 96.7 percent, interval 92.2 to 100. Guard rollbacks in the poison run: 15.
 
-DreamGraph starts even with an unweighted walk, at sixty-three percent, because it has not seen a review yet. One update later it is at eighty-five, in line with the hand-set costs.
+## 0:55 — The synthetic chart
 
-## 1:05 — The swap
+[Leave the chart on Synthetic. Point at the drift marker, then the teal line and the dashed 1-hop line.]
 
-[Point at the dashed marker on iteration 4.]
+Three hundred held-out companies, seeds 0, 1, and 2. The noise is synthetic and labeled. At iteration 4 the wikidata and scraper labels swap. DreamGraph drops to 45.9, then the last-100 window brings it back to 90.6, and every recovered answer is the 3-hop chain. Unweighted stays at 20.7 and never takes that chain. The 1-hop lookup starts ahead, because a node-id tie-break happens to pick the long chain when every cost is 1, and after the swap it stays at 45.9. Summing the path is the part that recovers. The dict learner matches DreamGraph on every iteration. Same sum, outside the engine. I am not going to pretend the engine invented a different objective.
 
-At iteration four we swap the Wikidata and scraper labels on every relation from fifteen up. We do not move the people. We only change the name on the edge. The score on that iteration still uses the old costs, so DreamGraph drops to forty-seven percent. The ninety-five percent interval there is forty-four to fifty. Hand-set costs, BM25, and a one-shot fit fall to thirty-three point eight and never come back, because they still believe the word Wikidata. A copy frozen after iteration three stays at forty-seven.
+## 1:35 — Book sellers
 
-[Trace the teal line back up.]
+[Switch the chart to Book sellers.]
 
-The learner refits on only the last hundred reviews. By iteration six DreamGraph is at eighty point four, interval seventy-seven point seven to eighty-two point nine. The unweighted line never moves. It is sixty-three the whole way, because the tie break is node ids, and the swap did not change those.
+This is the public Book data set. Gold author lists from book covers, three real sellers: Revaluation Books, The Book Depository, textbooksNow. On the slice they are right about 96, 63, and 38 percent of the time. The learned costs come out in that order. Accuracy does not move: 96.7 the whole way, same as unweighted, same as 1-hop, same as the dict learner. Alphabetical listing ids already select Revaluation Books, and Revaluation listed every book here. BM25, which does not get that tie-break, sits at 78.9. That is the honest result. The gain is the cost ranking, not a higher accuracy than a lucky tie-break.
 
-## 1:50 — Say the honest part
+## 2:05 — The guard
 
-[Hover the dict-learner legend.]
+[Switch the chart to Poison. Scroll the receipts so a rolled-back card is on screen.]
 
-The dashed twin is the same learner on plain Python dicts. It matches DreamGraph on every iteration. I am not going to pretend otherwise. HydraDB's job in this design is the weighted path search, `algo.SSpaths`, not a secret update rule. On this machine Docker was not available, so that search ran in-process. The probe file says `live_engine: false`. The microseconds in the latency panel are not a database round trip.
+From iteration 4, training reviews call wikidata always wrong and scraper always right. The held-out people do not change. Naive accepts it and drops to 45.9. DreamGraph stays at 90.6. Fifteen receipts, five on each seed. Seed 0, iteration 4: guard accuracy 60 to 40, held-out 91.7 to 44.7, reason "guard accuracy fell". A model frozen after iteration 3 also stays at 90.6, because the poison starts at 4. Hypothesis H9 says that out loud. The receipt is what shows the guard looked.
 
-## 2:15 — One company
+## 2:35 — One path, live
 
-[Open the query card. Pick a company marked "modes disagree". Leave it on DreamGraph, then press Unweighted.]
+[Open the live path card. Pick a company marked "modes disagree". DreamGraph, then Unweighted.]
 
-DreamGraph walks the scraper chain and names the true owner. Unweighted still walks the edges that are labeled Wikidata, and names the decoy. That answer is computed when you click, from the saved costs and the regenerated graph. It is not a row someone pasted into the page.
-
-## 2:35 — The guard
-
-[Scroll the policy list so a red "Rolled back" card is on screen. Seed 2, iterations 4 and 5.]
-
-Two refits were rejected. The guard holds out the last twenty questions in the window, and if the new costs do worse there, the previous costs stay. Seed two hit that at the swap and on the next iteration. The other seeds accepted every update. Greedy, with no window and no guard, also climbs back, so the window is not magic. The rollback is the part you can see.
+DreamGraph walks the long chain and names the gold person. Unweighted stays on two hops. That answer is `algo.SSpaths` on the running node. The Book tab loads that book's edges into the same node. The latency panel is the benchmark sample, p50 about 6.3 milliseconds, and Measure again hits the live engine.
 
 ## 2:55 — Stop
 
-Synthetic gadgets, no shared ownership graph, no live engine call in the published numbers. The runbook is `docs/HYDRA_RUNBOOK.md` if you want the probe on `ghcr.io/hydra-db/hydradb:0.4.0` before you send this anywhere.
+Nine pre-registered hypotheses, all PASS, written by the evaluator from the evidence files. Synthetic gadgets are still gadgets. The book slice is small, and it does not beat its own tie-break. The loom and the posts in `docs/` are drafts. They are not posted.

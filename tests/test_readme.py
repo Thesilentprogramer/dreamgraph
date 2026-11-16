@@ -18,6 +18,9 @@ def test_readme_quotes_the_export_and_labels_the_noise():
     assert "hydradb" in readme
     assert "Dict learner" in readme
     assert "3-hop" in readme
+    assert "Revaluation Books" in readme
+    assert "H1" in readme
+    assert "15 rollbacks" in readme
     posts = (ROOT / "docs" / "POSTS.md").read_text()
     assert "@hydra_db" in posts
     assert "Not posted" in posts
