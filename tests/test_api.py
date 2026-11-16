@@ -47,22 +47,22 @@ def test_query_toggle_changes_the_path_on_a_disagreement():
     assert bad.status_code == 400
 
 
-def test_book_query_matches_the_in_process_sum():
+def test_vuln_query_matches_the_in_process_sum():
     document = client.get("/api/results").json()
-    rel = document["public"]["demo"]["questions"][0]
-    learned = client.get("/api/query", params={"rel": rel, "mode": "dreamgraph", "dataset": "book"})
+    rel = document["vuln"]["demo"]["questions"][0]
+    learned = client.get("/api/query", params={"rel": rel, "mode": "dreamgraph", "dataset": "vuln"})
     assert learned.status_code == 200
     body = learned.json()
     assert body["computed"] == "hydradb"
     assert body["procedure"] == "algo.SSpaths"
-    assert body["dataset"] == "book"
-    assert body["path"][0]["kind"] == "book"
-    assert body["path"][-1]["kind"] == "author"
-    from dreamgraph.public_world import generate_public_world
+    assert body["dataset"] == "vuln"
+    assert body["path"][0]["kind"] == "question"
+    assert body["path"][-1]["kind"] == "verdict"
     from dreamgraph.search import predict_relation
+    from dreamgraph.vuln_world import generate_vuln_world
 
-    world = generate_public_world(document["public"]["demo"]["seed"])
-    prediction = predict_relation(world, rel, document["public"]["demo"]["costs"])
+    world = generate_vuln_world(document["vuln"]["demo"]["seed"])
+    prediction = predict_relation(world, rel, document["vuln"]["demo"]["costs"])
     assert body["person"] == prediction.person
     assert len(body["path"]) == len(prediction.path)
 

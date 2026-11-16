@@ -56,15 +56,22 @@ class HydraGraph:
                 },
             )
 
-    def stamp_source_costs(self, costs: dict[str, float]) -> None:
+    def stamp_source_costs(self, costs: dict[str, float], rel_id: int | None = None) -> None:
         for source, cost in costs.items():
             weight = float(cost)
             if weight <= 0:
                 raise ValueError("edge cost must stay positive; gold edges are not pinned")
-            self.client.query(
-                "MATCH (a:Entity)-[r:OWNS]->(b:Entity) WHERE r.source = $source SET r.cost = $cost",
-                {"source": source, "cost": round(weight, 5)},
-            )
+            if rel_id is None:
+                self.client.query(
+                    "MATCH (a:Entity)-[r:OWNS]->(b:Entity) WHERE r.source = $source SET r.cost = $cost",
+                    {"source": source, "cost": round(weight, 5)},
+                )
+            else:
+                self.client.query(
+                    "MATCH (a:Entity)-[r:OWNS]->(b:Entity) "
+                    "WHERE r.rel_id = $rel AND r.source = $source SET r.cost = $cost",
+                    {"source": source, "rel": rel_id, "cost": round(weight, 5)},
+                )
 
     def swap_drift_labels(self, rel_ids: list[int]) -> None:
         for rel_id in rel_ids:
@@ -85,10 +92,14 @@ class HydraGraph:
         caller has already stamped ``costs`` onto matching source labels.
         """
 
+        degree = len(world.chains.get(rel_id) or [])
+        # One page has to include the claim node and the verdict for every feed.
+        # The synthetic gadgets have three chains, so this stays at 8.
+        total = max(8, min(32, 2 * degree))
         cypher, params = build_ss_paths(
             src=world.leaf[rel_id],
             weighted=costs is not None,
-            total=8,
+            total=total,
             max_len=3,
             rel_types=["OWNS"],
         )

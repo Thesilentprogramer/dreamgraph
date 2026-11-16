@@ -16,8 +16,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from dreamgraph.bench import EXPORT, percentile
 from dreamgraph.config import HYDRA_TOKEN, HYDRA_URL
 from dreamgraph.hydra_graph import HydraGraph, concurrent_latencies
-from dreamgraph.public_world import generate_public_world
 from dreamgraph.search import Prediction
+from dreamgraph.vuln_world import generate_vuln_world
 from dreamgraph.world import World, apply_drift, generate_world
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -84,15 +84,7 @@ def load_results() -> dict:
             status_code=404,
             detail="results/summary.json is missing. Run make bench.",
         )
-    document = json.loads(EXPORT.read_text())
-    public = document.get("public")
-    demo = public.get("demo") if isinstance(public, dict) else None
-    if demo and "labels" not in demo:
-        world = generate_public_world(demo["seed"])
-        demo["labels"] = {
-            str(rel_id): world.names[world.leaf[rel_id]] for rel_id in demo.get("questions") or []
-        }
-    return document
+    return json.loads(EXPORT.read_text())
 
 
 def demo_world(document: dict):
@@ -108,16 +100,16 @@ def demo_world(document: dict):
     return _world_cache["world"]
 
 
-def book_world(document: dict) -> World:
-    public = document.get("public") or {}
-    demo = public.get("demo") or {}
+def vuln_world(document: dict) -> World:
+    vuln = document.get("vuln") or {}
+    demo = vuln.get("demo") or {}
     if "seed" not in demo:
-        raise HTTPException(status_code=404, detail="Book slice is not in this export.")
-    key = ("book", demo["seed"])
-    if _world_cache.get("book_key") != key:
-        _world_cache["book_key"] = key
-        _world_cache["book_world"] = generate_public_world(demo["seed"])
-    return _world_cache["book_world"]
+        raise HTTPException(status_code=404, detail="Vulnerability slice is not in this export.")
+    key = ("vuln", demo["seed"])
+    if _world_cache.get("vuln_key") != key:
+        _world_cache["vuln_key"] = key
+        _world_cache["vuln_world"] = generate_vuln_world(demo["seed"])
+    return _world_cache["vuln_world"]
 
 
 def _hydra_up() -> bool:
@@ -193,7 +185,7 @@ def _path_payload(world, rel_id: int, mode: str, costs: dict | None, prediction:
         "drift_applied": world.drifted,
         "computed": "hydradb",
         "procedure": "algo.SSpaths",
-        "dataset": "book" if world.kinds.get(world.leaf[rel_id]) == "book" else "synthetic",
+        "dataset": "vuln" if world.kinds.get(world.leaf[rel_id]) == "question" else "synthetic",
     }
 
 
@@ -234,9 +226,9 @@ def results() -> dict:
     return load_results()
 
 
-def _ensure_book_edge(world: World, rel: int) -> HydraGraph:
+def _ensure_vuln_edge(world: World, rel: int) -> HydraGraph:
     graph = _graph()
-    loaded = _world_cache.setdefault("book_rels", set())
+    loaded = _world_cache.setdefault("vuln_rels", set())
     with _load_lock:
         if rel not in loaded:
             graph.load(world, rel_ids={rel})
@@ -252,25 +244,27 @@ def query(
 ) -> dict:
     if mode not in {"dreamgraph", "unweighted"}:
         raise HTTPException(status_code=400, detail="mode must be dreamgraph or unweighted")
-    if dataset not in {"synthetic", "book"}:
-        raise HTTPException(status_code=400, detail="dataset must be synthetic or book")
+    if dataset not in {"synthetic", "vuln"}:
+        raise HTTPException(status_code=400, detail="dataset must be synthetic or vuln")
     if not _hydra_up():
         raise HTTPException(status_code=503, detail="HydraDB is not answering on :8443")
     document = load_results()
-    if dataset == "book":
-        world = book_world(document)
+    if dataset == "vuln":
+        world = vuln_world(document)
         if rel not in world.leaf:
-            raise HTTPException(status_code=404, detail=f"unknown book relation {rel}")
-        costs = None if mode == "unweighted" else document["public"]["demo"]["costs"]
-        graph = _ensure_book_edge(world, rel)
+            raise HTTPException(status_code=404, detail=f"unknown vulnerability question {rel}")
+        costs = None if mode == "unweighted" else document["vuln"]["demo"]["costs"]
+        graph = _ensure_vuln_edge(world, rel)
+        if costs is not None:
+            graph.stamp_source_costs(costs, rel)
     else:
         world = demo_world(document)
         if rel not in world.leaf:
             raise HTTPException(status_code=404, detail=f"unknown relation {rel}")
         costs = None if mode == "unweighted" else document["demo"]["costs"]
         graph = _ensure_loaded(world)
-    if costs is not None:
-        graph.stamp_source_costs(costs)
+        if costs is not None:
+            graph.stamp_source_costs(costs)
     prediction = graph.owner(world, rel, costs)
     return _path_payload(world, rel, mode, costs, prediction)
 

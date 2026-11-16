@@ -7,9 +7,17 @@ const SOURCE_COLOR = {
   wikidata: "#7aa2f7",
   registry: "#e2a15a",
   scraper: "#f07178",
-  "Revaluation Books": "#3cbfa8",
-  "The Book Depository": "#e2a15a",
-  textbooksNow: "#f07178",
+  nvd: "#38bdf8",
+  nvd_mirror: "#fb7185",
+  debian: "#e2a15a",
+  alpine: "#3cbfa8",
+  linux: "#a3e635",
+  redhat: "#f07178",
+  suse: "#c4b5fd",
+  opensuse: "#d7c07a",
+  alma: "#94a3b8",
+  mageia: "#f9a8d4",
+  rocky: "#fdba74",
 };
 
 function pct(value) {
@@ -120,7 +128,7 @@ export default function App() {
 
   useEffect(() => {
     if (!results) return;
-    const next = queryDataset === "book" ? results.public?.demo?.questions?.[0] : results.demo?.questions?.[0];
+    const next = queryDataset === "vuln" ? results.vuln?.demo?.questions?.[0] : results.demo?.questions?.[0];
     setRel(next ?? null);
     setQuery(null);
     setQueryError("");
@@ -129,7 +137,7 @@ export default function App() {
   useEffect(() => {
     if (rel == null || !results) return undefined;
     const allowed =
-      queryDataset === "book" ? results.public?.demo?.questions || [] : results.demo?.questions || [];
+      queryDataset === "vuln" ? results.vuln?.demo?.questions || [] : results.demo?.questions || [];
     if (!allowed.includes(rel)) return undefined;
     let cancelled = false;
     setQueryLoading(true);
@@ -201,12 +209,12 @@ export default function App() {
     );
   }
 
-  const book = results.public;
-  const poison = results.poison;
+  const vuln = results.vuln;
+  const poison = results.vuln_poison;
   const hypotheses = results.hypotheses || [];
   const view =
-    dataset === "book" && book?.series
-      ? book
+    dataset === "vuln" && vuln?.series
+      ? vuln
       : dataset === "poison" && poison?.series
         ? poison
         : results;
@@ -214,14 +222,16 @@ export default function App() {
   const dream = series.dreamgraph;
   const end = last(dream);
   const markers =
-    dataset === "poison"
+    dataset === "poison" && poison
       ? [{ iter: poison.poison_iter, label: "Poison", color: "#f07178" }]
-      : dataset === "synthetic"
-        ? [{ iter: results.drift_iter, label: "Drift", color: "#e2a15a" }]
-        : [];
+      : dataset === "vuln" && vuln
+        ? [{ iter: vuln.drift_iter || 4, label: vuln.drift?.kind === "real" ? "Newer feeds" : "Simulated", color: "#e2a15a" }]
+        : dataset === "synthetic"
+          ? [{ iter: results.drift_iter, label: "Drift", color: "#e2a15a" }]
+          : [];
   const load = liveLoad || results.load;
   const policySource =
-    dataset === "poison" ? poison.policies || poison.receipts || [] : dataset === "book" ? book.policies || [] : results.policies;
+    dataset === "poison" ? poison?.policies || poison?.receipts || [] : dataset === "vuln" ? vuln?.policies || [] : results.policies;
   const policies = policySource
     .filter((version) => seedFilter === "all" || String(version.seed) === seedFilter)
     .slice()
@@ -231,8 +241,8 @@ export default function App() {
       ? poison.rollback_count
       : policySource.filter((version) => version.rolled_back).length;
   const questions =
-    queryDataset === "book" ? book?.demo?.questions || [] : results.demo.questions || [];
-  const labels = queryDataset === "book" ? book?.demo?.labels || {} : null;
+    queryDataset === "vuln" ? vuln?.demo?.questions || [] : results.demo.questions || [];
+  const labels = queryDataset === "vuln" ? vuln?.demo?.labels || {} : null;
   const oneHop = results.series.one_hop;
   const passes = hypotheses.filter((item) => item.verdict === "PASS").length;
 
@@ -248,29 +258,34 @@ export default function App() {
       detail: oneHop ? `95% CI ${pct(oneHop.ci_low.at(-1))}–${pct(oneHop.ci_high.at(-1))}` : "Replay missing",
     },
     {
-      label: "Book sellers, held out",
-      value: book ? pct(book.series.dreamgraph.accuracy.at(-1)) : "—",
-      detail: book
-        ? `95% CI ${pct(book.series.dreamgraph.ci_low.at(-1))}–${pct(book.series.dreamgraph.ci_high.at(-1))} · ${book.config.held_out} books`
+      label: "Vuln feeds, held out",
+      value: vuln ? pct(vuln.series.dreamgraph.accuracy.at(-1)) : "—",
+      detail: vuln
+        ? `95% CI ${pct(vuln.series.dreamgraph.ci_low.at(-1))}–${pct(vuln.series.dreamgraph.ci_high.at(-1))} · ${vuln.config.held_out} tags`
         : "Slice missing",
     },
     {
-      label: "Guard rollbacks",
+      label: "NVD-mirror rollbacks",
       value: poison ? String(poison.rollback_count) : "0",
-      detail: poison ? `Poison from iteration ${poison.poison_iter}, 3 seeds` : "No poison scenario",
+      detail: poison
+        ? `From iteration ${poison.poison_iter}. ${Object.entries(poison.rollback_counts || {})
+            .filter(([, count]) => count === 0)
+            .map(([seed]) => `Seed ${seed} accepted the poisoned update.`)
+            .join(" ")}`
+        : "No poison scenario",
     },
   ];
 
   const ablationRows =
     dataset === "poison"
       ? ["dreamgraph", "naive", "greedy", "frozen_at_3", "dict_learner", "one_hop", "unweighted"]
-      : dataset === "book"
-        ? ["dreamgraph", "one_hop", "unweighted", "dict_learner", "bm25", "hand_set", "greedy", "frozen_at_3"]
+      : dataset === "vuln"
+        ? ["dreamgraph", "majority", "nvd_only", "unweighted", "hand_set", "bm25", "ghsa_only", "dict_learner", "one_hop", "frozen_at_3", "greedy"]
         : ["dreamgraph", "one_hop", "unweighted", "dict_learner"];
 
   const ablationNote =
-    dataset === "book"
-      ? "On this slice every seller is a 2-edge chain, so a 1-hop lookup and the full sum rank the same seller. Unweighted tie-breaks on alphabetical listing ids and already selects Revaluation Books, the most reliable of the three. Accuracy therefore ties. The learned costs are the part that recovers the seller ranking. BM25 tie-breaks on author-node id and does not."
+    dataset === "vuln"
+      ? "Each feed is a two-edge chain, so a 1-hop lookup and the full sum rank the same feed. Majority vote lets the noisy distros outvote NVD. GHSA has no version ranges here, so that baseline abstains and is scored as not-affected. The learned costs are what HydraDB’s weighted path search consumes."
       : dataset === "poison"
         ? "From iteration 4, train reviews call wikidata wrong and scraper right. Held-out people stay put. Naive accepts the lie. The guard scores the proposal on the last 20 window questions against the true owner and rolls back."
         : "1-hop lookup spends the learned cost of the first edge only and never calls algo.SSpaths. Unweighted search counts hops. DreamGraph sums the learned costs; this synthetic run did that sum inside HydraDB. The dict learner sums the same costs in process, so the accuracies match. The gap that is not zero is the path sum versus a single edge.";
@@ -310,8 +325,7 @@ export default function App() {
             The path cost learns which source to trust.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-muted">
-            DreamGraph keeps a cost on each vendor, refits it from reviewer feedback, and asks HydraDB{" "}
-            <span className="text-ink">algo.SSpaths</span> for the cheapest path. A bad update is rolled back when it loses on the guard slice, and the receipt stays on the timeline.
+            When NVD and the distro feeds disagree on what is actually vulnerable, DreamGraph learns which source to trust, and HydraDB’s weighted path search uses those costs to answer. A bad update is rolled back when it loses on the guard slice.
           </p>
         </section>
 
@@ -330,17 +344,17 @@ export default function App() {
             <div>
               <h2 className="font-serif text-2xl">Held-out accuracy</h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
-                {dataset === "book"
-                  ? `${book.config.held_out} gold books, ${book.config.seeds.length} split seeds. Bands are bootstrap 95% intervals. No label drift on this slice.`
+                {dataset === "vuln"
+                  ? `${vuln.config.held_out} held-out tags, ${vuln.config.seeds.length} seeds. Batches follow feed modified times. Drift here is ${vuln.drift?.kind}.`
                   : dataset === "poison"
-                    ? `${poison.config.held_out} synthetic questions, ${poison.config.seeds.length} seeds. The marker is when wikidata starts lying in the training reviews.`
+                    ? `${poison.config.held_out} tags, ${poison.config.seeds.length} seeds. The marker is when reviews start trusting the bad NVD mirror.`
                     : `${results.config.held_out} questions, ${results.config.seeds.length} seeds. The marker is the wikidata/scraper label swap, scored before that iteration’s update.`}
               </p>
             </div>
             <div className="inline-flex rounded-full border border-line bg-bg p-0.5" role="tablist" aria-label="Chart dataset">
               {[
                 ["synthetic", "Synthetic"],
-                ["book", "Book sellers"],
+                ["vuln", "Vuln feeds"],
                 ["poison", "Poison"],
               ].map(([value, label]) => (
                 <button
@@ -424,6 +438,41 @@ export default function App() {
           </div>
         </Card>
 
+        {vuln?.source_table && (
+          <Card>
+            <h2 className="font-serif text-2xl">Learned trust versus measured accuracy</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+              Cost is the mean final DreamGraph weight. Lower means the path search trusts that feed. Accuracy is the feed’s agreement with the Zenodo label on this slice, not a feature the learner was given. {vuln.drift?.note}
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="text-xs uppercase tracking-[0.12em] text-muted">
+                  <tr>
+                    <th className="py-2 pr-3 font-medium">Feed</th>
+                    <th className="py-2 pr-3 text-right font-medium">Learned cost</th>
+                    <th className="py-2 pr-3 text-right font-medium">Accuracy</th>
+                    <th className="py-2 text-right font-medium">Judgments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...vuln.source_table]
+                    .sort((a, b) => a.learned_cost - b.learned_cost)
+                    .map((row) => (
+                      <tr key={row.source} className="border-t border-line">
+                        <th className="py-2 pr-3 text-left font-medium" style={{ color: SOURCE_COLOR[row.source] || undefined }}>
+                          {row.source}
+                        </th>
+                        <td className="tabular py-2 pr-3 text-right font-mono">{row.learned_cost.toFixed(3)}</td>
+                        <td className="tabular py-2 pr-3 text-right font-mono">{pct(row.accuracy)}</td>
+                        <td className="tabular py-2 text-right font-mono text-muted">{row.n}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
         <Card>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -475,7 +524,7 @@ export default function App() {
             <div className="mt-4 flex flex-wrap gap-2">
               {[
                 ["synthetic", "Ownership gadget"],
-                ["book", "Book seller"],
+                ["vuln", "CVE tag"],
               ].map(([value, label]) => (
                 <button
                   key={value}
@@ -489,7 +538,7 @@ export default function App() {
               ))}
             </div>
             <label className="mt-4 block text-xs uppercase tracking-[0.12em] text-muted" htmlFor="relation">
-              {queryDataset === "book" ? "Book" : "Company"}
+              {queryDataset === "vuln" ? "Package tag" : "Company"}
             </label>
             <select
               id="relation"
@@ -499,14 +548,14 @@ export default function App() {
             >
               {questions.map((id) => (
                 <option key={id} value={id}>
-                  {labels ? labels[String(id)] || `Book ${id}` : `Northwind ${id}`}
+                  {labels ? labels[String(id)] || `Question ${id}` : `Northwind ${id}`}
                   {queryDataset === "synthetic" && results.demo.disagree?.includes(id) ? " · modes disagree" : ""}
                 </option>
               ))}
             </select>
-            {queryDataset === "book" && (book?.demo?.disagree || []).length === 0 && (
+            {queryDataset === "vuln" && (
               <p className="mt-2 text-xs leading-5 text-muted">
-                On this slice the two modes agree. Alphabetical listing ids already select Revaluation Books, and the learned costs do too.
+                Live algo.SSpaths on this tag. The chain is question, claim, verdict.
               </p>
             )}
             {queryLoading && <p className="mt-4 text-sm text-muted">Walking the graph…</p>}
@@ -650,8 +699,8 @@ export default function App() {
       </main>
       <footer className="mx-auto flex max-w-6xl flex-col gap-2 px-4 pb-10 text-xs leading-5 text-muted">
         <p>
-          Synthetic noise is labeled as such. The Book numbers use the gold-100 author lists from Dong, Berti-Equille, and Srivastava, cached in{" "}
-          <span className="text-ink">data/book/claims.jsonl</span>. The dict learner matches DreamGraph where both minimize the same edge-cost sum. HydraDB is the engine that evaluates that sum on the live path.
+          Synthetic noise is labeled as such. Vulnerability numbers use the Zenodo 16440960 gold tags and the processed feeds in{" "}
+          <span className="text-ink">data/vuln/claims.jsonl</span>. The dict learner matches DreamGraph where both minimize the same edge-cost sum. HydraDB is the engine that evaluates that sum on the live path.
         </p>
         <p>
           <a className="text-ink underline decoration-line underline-offset-2" href={GITHUB}>

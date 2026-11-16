@@ -9,6 +9,9 @@ const COLORS = {
   frozen_at_3: "#e15d5d",
   one_hop: "#c4b5fd",
   naive: "#fb7185",
+  majority: "#94a3b8",
+  nvd_only: "#38bdf8",
+  ghsa_only: "#f9a8d4",
 };
 
 export const LABELS = {
@@ -22,6 +25,9 @@ export const LABELS = {
   frozen_at_3: "Frozen after 3",
   one_hop: "1-hop lookup",
   naive: "Naive, no guard",
+  majority: "Majority vote",
+  nvd_only: "NVD only",
+  ghsa_only: "GHSA only",
 };
 
 const ORDER = [
@@ -31,6 +37,9 @@ const ORDER = [
   "one_shot",
   "one_hop",
   "naive",
+  "majority",
+  "nvd_only",
+  "ghsa_only",
   "greedy",
   "frozen_at_3",
   "dict_learner",
