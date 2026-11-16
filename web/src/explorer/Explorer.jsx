@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import * as THREE from "three";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
@@ -57,34 +57,47 @@ function neighborIdsOf(focusId, links) {
   return ids;
 }
 
+const labelElements = new Map();
+
 function makeLabel(node) {
-  const el = document.createElement("div");
-  el.textContent = node.name;
-  el.style.color = BLUE;
-  el.style.fontFamily = "IBM Plex Mono, ui-monospace, monospace";
-  el.style.fontSize = "11px";
-  el.style.fontWeight = "500";
-  el.style.letterSpacing = "0.08em";
-  el.style.textTransform = "uppercase";
-  el.style.textShadow = "0 0 0 transparent";
-  el.style.pointerEvents = "none";
-  el.style.whiteSpace = "nowrap";
-  el.dataset.id = node.id;
-  el.style.display = "none";
+  let el = labelElements.get(node.id);
+  if (!el) {
+    el = document.createElement("div");
+    el.textContent = node.name;
+    el.style.color = BLUE;
+    el.style.fontFamily = "IBM Plex Mono, ui-monospace, monospace";
+    el.style.fontSize = "11px";
+    el.style.fontWeight = "500";
+    el.style.letterSpacing = "0.08em";
+    el.style.textTransform = "uppercase";
+    el.style.pointerEvents = "none";
+    el.style.whiteSpace = "nowrap";
+    el.dataset.id = node.id;
+    labelElements.set(node.id, el);
+  }
   node.__label = el;
   const object = new CSS2DObject(el);
-  object.position.set(0, radiusOf(node, {}) + 0.7, 0);
+  object.visible = false;
+  object.position.set(0, radiusOf(node, {}) + 1.4, 0);
+  node.__css = object;
   return object;
 }
 
 function sphereFor(node, costs) {
   const group = new THREE.Group();
+  const radius = radiusOf(node, costs);
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(radiusOf(node, costs), 18, 18),
-    new THREE.MeshBasicMaterial({ color: paint(node, costs), transparent: true, opacity: 0.28 }),
+    new THREE.SphereGeometry(radius, 20, 20),
+    new THREE.MeshBasicMaterial({ color: BLUE, transparent: true, opacity: 0.2 }),
+  );
+  const wire = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 1.18, 14, 14),
+    new THREE.MeshBasicMaterial({ color: BLUE, wireframe: true }),
   );
   node.__mesh = mesh;
+  node.__wire = wire;
   group.add(mesh);
+  group.add(wire);
   group.add(makeLabel(node));
   return group;
 }
@@ -99,6 +112,8 @@ export default function Explorer({ onClose }) {
   const fgRef = useRef(null);
   const stars = useRef(null);
   const extraRenderers = useMemo(() => [new CSS2DRenderer()], []);
+  const costsRef = useRef({});
+  const nodeObject = useCallback((node) => sphereFor(node, costsRef.current), []);
   const [graph, setGraph] = useState(null);
   const [error, setError] = useState("");
   const [webgl] = useState(hasWebGL);
@@ -144,6 +159,7 @@ export default function Explorer({ onClose }) {
     const frame = graph?.iterations?.find((item) => item.iteration === Number(iteration));
     return frame?.costs || {};
   }, [graph, iteration]);
+  costsRef.current = costs;
 
   const visible = useMemo(() => {
     if (!graph) return { nodes: [], links: [] };
@@ -229,8 +245,9 @@ export default function Explorer({ onClose }) {
 
   useEffect(() => {
     if (!selected || !fgRef.current) return;
-    const distance = focusNeighbors.size > 14 ? 230 : 96;
-    fgRef.current.cameraPosition({ x: 16, y: 28, z: distance }, { x: 0, y: 0, z: 0 }, 900);
+    const distance = focusNeighbors.size > 14 ? 240 : 118;
+    const shift = distance * 0.13;
+    fgRef.current.cameraPosition({ x: 6, y: 16, z: distance }, { x: -shift, y: 0, z: 0 }, 700);
     const early = setTimeout(() => setFramed((count) => count + 1), 400);
     const later = setTimeout(() => setFramed((count) => count + 1), 1400);
     return () => {
@@ -240,48 +257,41 @@ export default function Explorer({ onClose }) {
   }, [selected, focusNeighbors]);
 
   useEffect(() => {
-    const show = new Set();
-    if (selected?.id) show.add(selected.id);
-    if (hovered?.id) show.add(hovered.id);
-    for (const id of focusNeighbors) show.add(id);
+    const seenLabels = new Map();
+    fgRef.current?.scene?.().traverse((object) => {
+      if (!object.isCSS2DObject) return;
+      const id = object.element?.dataset?.id;
+      if (!id) return;
+      const previous = seenLabels.get(id);
+      if (previous) previous.removeFromParent();
+      seenLabels.set(id, object);
+    });
     for (const node of visible.nodes) {
-      if (node.type === "feed") show.add(node.id);
       const mesh = node.__mesh;
-      const el = node.__label;
+      const wire = node.__wire;
+      const label = node.__css;
       const isFocus = node.id === selected?.id;
       const isNeighbor = focusNeighbors.has(node.id);
       const isHover = node.id === hovered?.id;
-      if (el) {
-        el.style.display = show.has(node.id) ? "block" : "none";
-        el.style.fontSize = isFocus ? "13px" : isNeighbor || isHover ? "9px" : "11px";
+      const near = isFocus || isNeighbor;
+      const showLabel = isFocus || isNeighbor || isHover || (node.type === "feed" && near);
+      const scale = isFocus ? 7 : isNeighbor ? 2.2 : 0.4;
+      if (mesh) {
+        mesh.scale.setScalar(scale);
+        mesh.material.opacity = isFocus ? 1 : isNeighbor ? 0.45 : 0.1;
+        mesh.material.transparent = !isFocus;
+        mesh.material.wireframe = false;
       }
-      if (mesh?.material) {
-        mesh.material.color.set(paint(node, costs));
-        mesh.material.opacity = isFocus || isNeighbor ? 0.96 : node.type === "feed" ? 0.5 : 0.14;
+      if (wire) {
+        wire.scale.setScalar(scale);
+        wire.visible = isNeighbor && !isFocus;
+      }
+      if (label) {
+        label.visible = showLabel;
+        label.position.y = radiusOf(node, costs) * scale + 1.6;
+        if (label.element) label.element.style.fontSize = isFocus ? "13px" : "10px";
       }
     }
-    const layer = extraRenderers[0]?.domElement;
-    const newest = new Map();
-    layer?.querySelectorAll("[data-id]").forEach((el) => {
-      const previous = newest.get(el.dataset.id);
-      if (previous) previous.remove();
-      newest.set(el.dataset.id, el);
-    });
-    const camera = fgRef.current?.camera?.();
-    const origin = new THREE.Vector3();
-    newest.forEach((el, id) => {
-      const node = visible.nodes.find((item) => item.id === id);
-      let onScreen = true;
-      if (camera && node) {
-        const placed = origin.set(node.x || 0, node.y || 0, node.z || 0).clone().project(camera);
-        const far = Math.hypot(node.x || 0, node.y || 0, node.z || 0) > 180;
-        onScreen = placed.z < 1 && Math.abs(placed.x) < 0.9 && Math.abs(placed.y) < 0.86 && !far;
-      }
-      const visibleLabel = show.has(id) && (id === selected?.id || onScreen);
-      el.style.display = visibleLabel ? "block" : "none";
-      const neighborOnly = focusNeighbors.has(id) && id !== selected?.id && !id?.startsWith("feed:");
-      el.style.fontSize = id === selected?.id ? "13px" : neighborOnly || id === hovered?.id ? "9px" : "11px";
-    });
   }, [selected, hovered, focusNeighbors, visible.nodes, costs, extraRenderers, framed]);
 
   useEffect(() => {
@@ -437,6 +447,7 @@ export default function Explorer({ onClose }) {
               {frame?.drift ? " · newer feeds" : ""}
               {frame?.rollback ? " · guard rollback" : ""}
               <input
+                className="dg-range"
                 type="range"
                 min={graph.iterations[0].iteration}
                 max={graph.iterations.at(-1).iteration}
@@ -466,7 +477,12 @@ export default function Explorer({ onClose }) {
                 key={name}
                 type="button"
                 onClick={() => setTab(name)}
-                className={`px-3 py-1 uppercase tracking-[0.12em] ${tab === name ? "bg-[#070EF4] text-[#F4F5FA]" : "border-2 border-[#070EF4]"}`}
+                className="px-3 py-1 uppercase tracking-[0.12em]"
+                style={
+                  tab === name
+                    ? { background: "#070EF4", color: "#F4F5FA", border: "2px solid #070EF4" }
+                    : { background: "#F0F2F1", color: "#070EF4", border: "2px solid #070EF4" }
+                }
               >
                 {name === "overview" ? "Overview" : "Ask HydraDB"}
               </button>
@@ -566,7 +582,7 @@ export default function Explorer({ onClose }) {
           nodeRelSize={1}
           nodeVal={(node) => radiusOf(node, costs)}
           nodeOpacity={0.95}
-          nodeThreeObject={(node) => sphereFor(node, costs)}
+          nodeThreeObject={nodeObject}
           nodeThreeObjectExtend={false}
           linkColor={(link) => {
             const id = link.target.id || link.target;
