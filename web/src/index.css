@@ -1,17 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Outfit", "Segoe UI", sans-serif;
-  --font-serif: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", "Arial", sans-serif;
+  --font-display: "Big Shoulders Display", "Arial Narrow", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --color-ink: #e7edf5;
-  --color-muted: #93a0b5;
-  --color-bg: #090b10;
-  --color-card: #121722;
-  --color-line: #263044;
-  --color-accent: #e2a15a;
-  --color-teal: #3cbfa8;
-  --color-danger: #f07178;
+  --color-ink: #070ef4;
+  --color-frame: #050ec5;
+  --color-paper: #f0f2f1;
+  --color-inverse: #f4f5fa;
+  --color-muted: #070ef4;
+  --color-bg: #f0f2f1;
+  --color-card: #f0f2f1;
+  --color-line: #070ef4;
+  --color-accent: #070ef4;
+  --color-teal: #070ef4;
+  --color-danger: #070ef4;
 }
 
 html,
@@ -22,54 +25,130 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(900px 420px at 10% -10%, rgba(60, 191, 168, 0.16), transparent 55%),
-    radial-gradient(700px 380px at 90% 0%, rgba(226, 161, 90, 0.12), transparent 50%),
-    var(--color-bg);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+  background: #050ec5;
+  color: #070ef4;
+  font-family: Inter, Arial, sans-serif;
 }
 
-.tabular {
-  font-variant-numeric: tabular-nums;
+button,
+input,
+select,
+textarea {
+  border-radius: 0;
+  font-family: inherit;
+  color: inherit;
 }
 
-.rise {
-  animation: rise 0.55s ease both;
+.frame {
+  margin: 24px;
+  min-height: calc(100vh - 48px);
+  background: #f0f2f1;
+  color: #070ef4;
 }
 
-.path-node {
-  animation: rise 0.45s ease both;
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.card {
-  border: 1px solid var(--color-line);
-  background: color-mix(in srgb, var(--color-card) 92%, transparent);
-  border-radius: 16px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
-}
-
-.eyebrow {
+.meta {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--color-teal);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rise,
-  .path-node {
-    animation: none;
+.display {
+  font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  line-height: 0.82;
+}
+
+.display-thin {
+  font-weight: 200;
+}
+
+.display-black {
+  font-weight: 900;
+}
+
+.kpi {
+  border: 2px solid #070ef4;
+  background: #f0f2f1;
+  color: #070ef4;
+  min-height: 148px;
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.kpi-invert {
+  background: #070ef4;
+  color: #f4f5fa;
+}
+
+.rule {
+  height: 2px;
+  background: #070ef4;
+  border: 0;
+}
+
+.tile {
+  border: 2px solid #070ef4;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #f0f2f1;
+}
+
+.tile-invert {
+  background: #070ef4;
+  color: #f4f5fa;
+}
+
+.bar-track {
+  height: 22px;
+  border: 2px solid #070ef4;
+  background: #f0f2f1;
+}
+
+.bar-fill {
+  height: 100%;
+  background: #070ef4;
+}
+
+.sq {
+  border: 2px solid #070ef4;
+  background: transparent;
+  color: #070ef4;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.sq-invert {
+  background: #070ef4;
+  color: #f4f5fa;
+}
+
+.insight {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.insight-mark {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #070ef4;
+  display: grid;
+  place-items: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  line-height: 1;
+}
+
+@media (max-width: 720px) {
+  .frame {
+    margin: 12px;
   }
 }

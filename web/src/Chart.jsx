@@ -1,18 +1,4 @@
-const COLORS = {
-  dreamgraph: "#3cbfa8",
-  dict_learner: "#9adfd2",
-  unweighted: "#c5cdd8",
-  hand_set: "#e2a15a",
-  one_shot: "#d38bdc",
-  greedy: "#7aa2f7",
-  bm25: "#d7c07a",
-  frozen_at_3: "#e15d5d",
-  one_hop: "#c4b5fd",
-  naive: "#fb7185",
-  majority: "#94a3b8",
-  nvd_only: "#38bdf8",
-  ghsa_only: "#f9a8d4",
-};
+const BLUE = "#070EF4";
 
 export const LABELS = {
   dreamgraph: "DreamGraph",
@@ -28,6 +14,9 @@ export const LABELS = {
   majority: "Majority vote",
   nvd_only: "NVD only",
   ghsa_only: "GHSA only",
+  conditional_k1: "Conditional, k=1",
+  topk_open: "Top-5, no margin",
+  per_feed: "Per-feed cost",
 };
 
 const ORDER = [
@@ -40,19 +29,37 @@ const ORDER = [
   "majority",
   "nvd_only",
   "ghsa_only",
+  "per_feed",
+  "topk_open",
+  "conditional_k1",
   "greedy",
   "frozen_at_3",
   "dict_learner",
   "dreamgraph",
 ];
 
-const BANDS = new Set(["dreamgraph", "unweighted", "one_hop", "naive", "frozen_at_3"]);
-const DASHED = new Set(["dict_learner", "one_shot", "greedy", "one_hop", "naive"]);
+const DASHED = new Set([
+  "dict_learner",
+  "one_shot",
+  "greedy",
+  "one_hop",
+  "naive",
+  "nvd_only",
+  "majority",
+  "per_feed",
+  "topk_open",
+  "unweighted",
+  "hand_set",
+  "bm25",
+  "ghsa_only",
+  "conditional_k1",
+  "frozen_at_3",
+]);
 
 export default function Chart({ series, driftIter, markers, hidden, onToggle, order }) {
-  const width = 800;
-  const height = 360;
-  const pad = { l: 48, r: 16, t: 18, b: 36 };
+  const width = 860;
+  const height = 340;
+  const pad = { l: 48, r: 16, t: 22, b: 32 };
   const innerW = width - pad.l - pad.r;
   const innerH = height - pad.t - pad.b;
   const methods = (order || ORDER).filter((method) => series?.[method]?.accuracy);
@@ -60,62 +67,53 @@ export default function Chart({ series, driftIter, markers, hidden, onToggle, or
   const steps = anchor ? series[anchor].accuracy.length : 0;
   const x = (iteration) => pad.l + (steps <= 1 ? innerW / 2 : ((iteration - 1) / (steps - 1)) * innerW);
   const y = (value) => pad.t + (1 - value) * innerH;
-  const pins =
-    markers ||
-    (driftIter ? [{ iter: driftIter, label: "Drift", color: "#e2a15a" }] : []);
-
-  const bandPath = (method) => {
-    const low = series[method].ci_low;
-    const high = series[method].ci_high;
-    if (!low || !high) return "";
-    const forward = high.map((value, index) => `${index === 0 ? "M" : "L"}${x(index + 1)},${y(value)}`);
-    const back = [...low].reverse().map((value, index) => `L${x(steps - index)},${y(value)}`);
-    return `${forward.join("")}${back.join("")}Z`;
-  };
+  const pins = markers || (driftIter ? [{ iter: driftIter, label: "Drift" }] : []);
 
   if (!steps) {
-    return <p className="text-sm text-muted">No series in this export.</p>;
+    return <p className="text-sm">No series in this export.</p>;
   }
 
   return (
     <div>
       <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label="Held-out accuracy by iteration">
-        {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
+        {[0.4, 0.6, 0.8, 1].map((tick) => (
           <g key={tick}>
-            <line x1={pad.l} x2={width - pad.r} y1={y(tick)} y2={y(tick)} stroke="currentColor" className="text-line" strokeWidth="1" />
-            <text x={pad.l - 8} y={y(tick) + 4} textAnchor="end" fill="currentColor" className="text-muted" fontSize="11" fontFamily="IBM Plex Mono, monospace">
+            <line x1={pad.l} x2={width - pad.r} y1={y(tick)} y2={y(tick)} stroke={BLUE} strokeWidth="1" opacity="0.35" />
+            <text x={pad.l - 8} y={y(tick) + 4} textAnchor="end" fill={BLUE} fontSize="11" fontFamily="IBM Plex Mono, monospace">
               {Math.round(tick * 100)}
             </text>
           </g>
         ))}
         {pins.map((pin) => (
           <g key={`${pin.label}-${pin.iter}`}>
-            <line x1={x(pin.iter)} x2={x(pin.iter)} y1={pad.t} y2={height - pad.b} stroke={pin.color} strokeDasharray="4 4" strokeWidth="1.5" />
-            <text x={x(pin.iter) + 6} y={pad.t + 12} fill={pin.color} fontSize="11" fontFamily="Outfit, sans-serif">
+            <rect x={x(pin.iter) - 6} y={pad.t} width="12" height={innerH} fill={BLUE} opacity="0.12" />
+            <text x={x(pin.iter) + 10} y={pad.t + 12} fill={BLUE} fontSize="11" fontFamily="IBM Plex Mono, monospace">
               {pin.label}
             </text>
           </g>
         ))}
-        {methods.filter((method) => !hidden?.[method] && BANDS.has(method) && series[method].ci_low).map((method) => (
-          <path key={`${method}-band`} d={bandPath(method)} fill={COLORS[method]} opacity="0.12" />
-        ))}
         {methods.filter((method) => !hidden?.[method]).map((method) => {
-          const points = series[method].accuracy.map((value, index) => `${x(index + 1)},${y(value)}`).join(" ");
+          const values = series[method].accuracy;
+          const points = values.map((value, index) => `${x(index + 1)},${y(value)}`).join(" ");
           return (
-            <polyline
-              key={method}
-              points={points}
-              fill="none"
-              stroke={COLORS[method] || "#8b97a8"}
-              strokeWidth={method === "dreamgraph" ? 2.6 : 1.6}
-              strokeDasharray={DASHED.has(method) ? "5 4" : undefined}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
+            <g key={method}>
+              <polyline
+                points={points}
+                fill="none"
+                stroke={BLUE}
+                strokeWidth={method === "dreamgraph" ? 2.5 : 1.25}
+                strokeDasharray={method === "dreamgraph" ? undefined : DASHED.has(method) ? "6 4" : undefined}
+                strokeOpacity={method === "dreamgraph" ? 1 : 0.55}
+              />
+              {method === "dreamgraph" &&
+                values.map((value, index) => (
+                  <rect key={index} x={x(index + 1) - 3.5} y={y(value) - 3.5} width="7" height="7" fill={BLUE} />
+                ))}
+            </g>
           );
         })}
         {Array.from({ length: steps }, (_, index) => (
-          <text key={index} x={x(index + 1)} y={height - 12} textAnchor="middle" fill="currentColor" className="text-muted" fontSize="11" fontFamily="IBM Plex Mono, monospace">
+          <text key={index} x={x(index + 1)} y={height - 8} textAnchor="middle" fill={BLUE} fontSize="11" fontFamily="IBM Plex Mono, monospace">
             {index + 1}
           </text>
         ))}
@@ -129,11 +127,10 @@ export default function Chart({ series, driftIter, markers, hidden, onToggle, or
               type="button"
               aria-pressed={!off}
               onClick={() => onToggle(method)}
-              className="inline-flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-xs text-muted transition hover:text-ink"
-              style={{ opacity: off ? 0.4 : 1 }}
+              className={off ? "sq" : "sq sq-invert"}
+              style={{ opacity: off ? 0.45 : 1 }}
             >
-              <span className="inline-block h-2 w-4 rounded-sm" style={{ background: COLORS[method] || "#8b97a8" }} />
-              {LABELS[method] || method}
+              <span className="meta">{LABELS[method] || method}</span>
             </button>
           );
         })}
@@ -142,4 +139,4 @@ export default function Chart({ series, driftIter, markers, hidden, onToggle, or
   );
 }
 
-export { COLORS, ORDER };
+export { ORDER };
